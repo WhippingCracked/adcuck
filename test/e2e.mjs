@@ -224,6 +224,10 @@ const ctx = await chromium.launchPersistentContext(userDataDir, {
   args: [
     `--disable-extensions-except=${ROOT}`,
     `--load-extension=${ROOT}`,
+    /* Chrome 137 turned --load-extension off by default. Without this the
+     * browser starts perfectly happily with no extension in it, and every
+     * check below fails for a reason none of them mention. */
+    "--disable-features=DisableLoadExtensionCommandLineSwitch",
     "--no-sandbox",
     "--no-first-run"
   ]
@@ -473,22 +477,92 @@ check(
 );
 
 /* --- L3: cosmetic layer ------------------------------------------------ */
+
 const cosmetic = await page.evaluate(() => {
   // "gone" = removed from the DOM, true = present but display:none
   const hidden = (sel) => {
     const el = document.querySelector(sel);
     return el ? getComputedStyle(el).display === "none" : "gone";
   };
+  /* When this fails, "hidden=false" on its own tells you nothing. Collect
+   * enough to name the cause: whether the sheet exists, whether it is
+   * switched off, how many of the selectors the browser actually accepted,
+   * and whether the one that matters is even in the list. */
+  const el = document.getElementById("cb-cosmetic");
+  let rules = null;
+  let listed = null;
+  try {
+    if (el && el.sheet) {
+      rules = el.sheet.cssRules.length;
+      /* Ask the stylesheet, not the filter list. CB_FILTERS is a content
+       * script global and this code runs in the page's own world, where it
+       * does not exist - reading it here reports "missing" every time,
+       * including when it is present, which is worse than not asking. */
+      /* Exactly that selector, not merely a rule mentioning it - three other
+       * entries contain it as part of a longer selector, so a substring test
+       * answers "yes" even when the one being asked about is gone. */
+      listed = [].slice.call(el.sheet.cssRules).some(
+        (r) => (r.selectorText || "").trim() === "ytd-ad-slot-renderer"
+      );
+    }
+  } catch (e) {
+    rules = "unreadable";
+  }
   return {
-    style: !!document.getElementById("cb-cosmetic"),
+    style: !!el,
+    disabled: el ? el.disabled : null,
+    rules,
+    accepted: document.documentElement.dataset.cbCss || "not reported",
+    listed,
+    state: document.documentElement.dataset.cbState || "(unset)",
     feedad: hidden("#feedad"),
     richad: document.getElementById("richad") === null,
     mastheadad: document.getElementById("masthead-ad") === null,
     realvideo: hidden("#realvideo")
   };
 });
-check("L3 injects its stylesheet", cosmetic.style === true);
-check("L3 hides the in-feed ad slot", cosmetic.feedad === true || cosmetic.feedad === "gone", `hidden=${cosmetic.feedad}`);
+check(
+  "L3 injects its stylesheet",
+  cosmetic.style === true,
+  cosmetic.style
+    ? ""
+    : "no stylesheet at all - Chrome may have started without the extension " +
+      "(--load-extension is off by default from Chrome 137)"
+);
+check(
+  "L3 hides the in-feed ad slot",
+  cosmetic.feedad === true || cosmetic.feedad === "gone",
+  `hidden=${cosmetic.feedad}` +
+    (cosmetic.feedad === false
+      ? ` | selectors accepted ${cosmetic.accepted}, rules ${cosmetic.rules},` +
+        ` sheet disabled=${cosmetic.disabled}, state=${cosmetic.state},` +
+        ` ad-slot rule present=${cosmetic.listed}`
+      : "")
+);
+
+/* A selector this browser cannot parse must cost only itself. Before, one bad
+ * entry threw away the whole rule and every ad came back. */
+const resilient = await page.evaluate(() => {
+  const s = document.createElement("style");
+  document.documentElement.appendChild(s);
+  let ok = 0;
+  for (const sel of ["ytd-ad-slot-renderer", "!!!not a selector!!!", "#realvideo"]) {
+    try {
+      s.sheet.insertRule(sel + " { display: none !important; }", s.sheet.cssRules.length);
+      ok++;
+    } catch (e) {
+      /* expected for the middle one */
+    }
+  }
+  const n = s.sheet.cssRules.length;
+  s.remove();
+  return { ok, n };
+});
+check(
+  "A selector this browser rejects costs only itself",
+  resilient.ok === 2 && resilient.n === 2,
+  `${resilient.ok} accepted, ${resilient.n} rules`
+);
 check("L3 removes the ad-only grid cell", cosmetic.richad === true);
 check("L3 removes the masthead ad", cosmetic.mastheadad === true);
 check("L3 leaves real content visible", cosmetic.realvideo === false, `hidden=${cosmetic.realvideo}`);
