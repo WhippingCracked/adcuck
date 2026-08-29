@@ -11,7 +11,7 @@
  * down. See tools/build-feed.mjs for how it is produced.
  */
 
-const DEFAULT_FEED = "https://archie-dev.github.io/adcuck/v1/manifest.json";
+const DEFAULT_FEED = "https://whippingcracked.github.io/adcuck/v1/manifest.json";
 const ALARM = "adcuck-filters";
 const PERIOD_MIN = 360;          // 6 hours
 const BACKOFF = [6, 12, 24];     // hours, after consecutive failures

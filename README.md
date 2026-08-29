@@ -173,11 +173,12 @@ route to removal from the store.
 3. Push a change to `src/filters/filters.js` or `rules/network.json`. The
    `publish-feed` workflow builds the feed, verifies every checksum, and
    deploys it.
-4. Point the extension at it — either edit `DEFAULT_FEED` in
-   `src/background/updater.js`, or leave the code alone and set it at runtime:
+4. Nothing to configure: `DEFAULT_FEED` in `src/background/updater.js` already
+   points at this repo's Pages address. To aim a build somewhere else (a fork,
+   a test feed) without touching the code:
 
    ```js
-   chrome.storage.sync.set({ feedUrl: "https://<you>.github.io/<repo>/v1/manifest.json" })
+   chrome.storage.sync.set({ feedUrl: "https://whippingcracked.github.io/adcuck/v1/manifest.json" })
    ```
 
 `node tools/build-feed.mjs` builds the same thing locally. The version is the
