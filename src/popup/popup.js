@@ -289,22 +289,43 @@
     );
   }
 
+  /* What "Check now" says afterwards. Kept as a plain function of the
+   * result so the wording is testable and lives in one place. */
+  function checkMessage(res) {
+    if (!res) return { text: "couldn't reach the filter list", kind: "warn" };
+    if (res.updated) return { text: "you just got new filters", kind: "ok" };
+    if (res.upToDate) return { text: "you have the latest filters", kind: "ok" };
+    if (res.needsExtensionUpdate) {
+      return { text: "update AdCuck to get newer filters", kind: "warn" };
+    }
+    if (res.error) return { text: "couldn't check \u2014 using the last list", kind: "warn" };
+    return { text: "you have the latest filters", kind: "ok" };
+  }
+  globalThis.__cbCheckMessage = checkMessage; // used by the tests
+
+  /* Show the answer where the version normally sits, then put the version
+   * back. The row is the natural place for it - no new UI, and the thing it
+   * is telling you about is right there. */
+  var metaTimer = null;
+  function flashMeta(msg) {
+    clearTimeout(metaTimer);
+    els.filterMeta.textContent = msg.text;
+    els.dot.style.background =
+      msg.kind === "warn" ? "var(--warn)" : "var(--accent)";
+    els.live.textContent = msg.text; // and say it out loud for screen readers
+    metaTimer = setTimeout(loadFilters, 5000);
+  }
+
   els.checkNow.addEventListener("click", function () {
+    clearTimeout(metaTimer);
     els.checkNow.disabled = true;
     els.checkNow.textContent = "Checking\u2026";
+    els.filterMeta.textContent = "checking for new filters\u2026";
+
     chrome.runtime.sendMessage({ type: "cb:checkFilters" }, function (res) {
       els.checkNow.disabled = false;
       els.checkNow.textContent = "Check now";
-      if (chrome.runtime.lastError || !res) {
-        els.live.textContent = "Could not reach the filter server.";
-      } else if (res.updated) {
-        els.live.textContent = "Filters updated to " + res.updated + ".";
-      } else if (res.error) {
-        els.live.textContent = "Couldn't update. Still blocking with the last list.";
-      } else {
-        els.live.textContent = "Filters are up to date.";
-      }
-      loadFilters();
+      flashMeta(checkMessage(chrome.runtime.lastError ? null : res));
     });
   });
 

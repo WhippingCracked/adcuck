@@ -689,6 +689,28 @@ if (extId) {
   check("Popup shows the filter version and when it was checked", /filters /.test(filterRow.text), filterRow.text);
   check("...with a Check now button", filterRow.hasCheck === true);
 
+  /* Every answer the button can give must read as plain English. */
+  const wording = await popup.evaluate(() => ({
+    updated: __cbCheckMessage({ updated: "2026.08.29-abc" }),
+    same: __cbCheckMessage({ upToDate: true }),
+    old: __cbCheckMessage({ needsExtensionUpdate: "2.0.0" }),
+    failed: __cbCheckMessage({ error: "Failed to fetch" }),
+    nothing: __cbCheckMessage(null)
+  }));
+  check(
+    "New filters are announced as new",
+    wording.updated.text === "you just got new filters" && wording.updated.kind === "ok",
+    wording.updated.text
+  );
+  check(
+    "No change says you are up to date",
+    wording.same.text === "you have the latest filters" && wording.same.kind === "ok",
+    wording.same.text
+  );
+  check("A failed check is flagged, not silent", wording.failed.kind === "warn", wording.failed.text);
+  check("An out-of-date extension says so", /update AdCuck/.test(wording.old.text), wording.old.text);
+  check("A dead service worker still says something", !!wording.nothing.text, wording.nothing.text);
+
   /* An unreachable feed must fail quietly and keep the last good list. This
    * goes through the same message the button sends. */
   await sw.evaluate(() =>
@@ -707,6 +729,22 @@ if (extId) {
   );
   check("An unreachable feed fails without breaking anything", !!badFeed?.error, JSON.stringify(badFeed));
   check("...and records why, for the popup to show", !!afterBad.err, afterBad.err);
+
+  /* And the row itself must actually change - the messages used to go only
+   * to the screen-reader region, where nobody could see them. */
+  const shown = await popup.evaluate(async () => {
+    document.getElementById("checkNow").click();
+    const meta = document.getElementById("filterMeta");
+    const during = meta.textContent;
+    for (let i = 0; i < 60 && meta.textContent === during; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return { during, after: meta.textContent, dot: document.getElementById("dot").style.background };
+  });
+  check("The row says it is checking while it checks", /checking/i.test(shown.during), shown.during);
+  check("...then shows the result in the row itself", /couldn't|latest|new filters/i.test(shown.after), shown.after);
+  check("...and colours the dot for a failure", /warn/.test(shown.dot), shown.dot);
+
   await sw.evaluate(() => chrome.storage.sync.set({ feedUrl: "" }));
 
   /* --- start-time readout ------------------------------------------ */
