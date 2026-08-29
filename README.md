@@ -261,6 +261,30 @@ filter list that will not load is worse than one that misses an ad.
 `1-get-filters.bat` runs discovery and this review back to back, so the whole
 loop is one double-click.
 
+#### The second copy of the field names
+
+`src/inject/interceptor.js` carries its own copy of `playerKeys`, `adMarkers`
+and `adGateReasons`. It has to: it runs in the page's own world at
+`document_start`, before anything from the extension's side can hand it
+`filters.js`, and the updated lists that arrive over the feed arrive *after*
+the page has already asked YouTube for the video — which is the moment that
+matters.
+
+Two copies of one truth always drift. `test/e2e.mjs` has always failed when
+they disagree, which is the right safety net but leaves you to fix it by hand
+in a file you should never have to open — and a new field name that only
+exists in `filters.js` is a filter that quietly does nothing.
+
+So `add-filters.mjs` calls `tools/sync-interceptor.mjs` immediately after it
+edits `filters.js`: both files are written, or neither is. `npm run sync`
+runs it on its own if you ever edit `filters.js` directly. It re-parses
+`interceptor.js` before saving — a player script that throws at
+`document_start` takes the whole page with it — and restores the original if
+anything goes wrong.
+
+`3-send-it.bat` treats `interceptor.js` as a filter file for the same reason,
+so the two never travel separately.
+
 ## Over-the-air filter updates
 
 Filters update themselves without a store release. The extension reads a static
@@ -522,6 +546,7 @@ tools/
   discover.mjs               drives the browser, watches a video
   discover-match.mjs         decides what counts as ad-shaped
   add-filters.mjs            reviews findings one by one, edits filters.js
+  sync-interceptor.mjs       keeps interceptor.js's copy in step
   build-feed.mjs             builds the published OTA feed
 test/e2e.mjs                 32-check Chromium suite
 ```

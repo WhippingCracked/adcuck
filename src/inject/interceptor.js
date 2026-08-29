@@ -56,7 +56,30 @@
     "adsEngagementPanelRenderer",
     "mealbarPromoRenderer",
     "brandVideoShelfRenderer",
-    "brandVideoSingletonRenderer"
+    "brandVideoSingletonRenderer",
+    "adPlacementRenderer",
+    "adBreakServiceRenderer",
+    "adAvatarViewModel",
+    "adBadgeViewModel",
+    "adButtonViewModel",
+    "aboutThisAdRenderer",
+    "playerBytesAdLayoutRenderer",
+    "aboveFeedAdLayoutRenderer",
+    "adImageViewModel",
+    "adAvatarLockupViewModel",
+    "adDetailsLineViewModel",
+    "inPlayerAdLayoutRenderer",
+    "adPreviewViewModel",
+    "playerAdAvatarLockupCardButtonedViewModel",
+    "visitAdvertiserLinkViewModel",
+    "adBadgeRenderer",
+    "adDurationRemainingRenderer",
+    "adInfoRenderer",
+    "adHoverTextButtonRenderer",
+    "adPodIndexViewModel",
+    "playerLegacyDesktopWatchAdsRenderer",
+    "playerAdParams",
+    "adsEngagementPanelContentRenderer"
   ];
 
   /* ---------------------------- ENFORCEMENT -----------------------------

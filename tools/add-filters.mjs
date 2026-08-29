@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
+import { sync } from "./sync-interceptor.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FILTERS = path.join(ROOT, "src/filters/filters.js");
@@ -172,6 +173,12 @@ try {
   if (after.hide.length !== current.hide.length + accept.hide.length) {
     throw new Error("the list came out the wrong length");
   }
+
+  /* The part of the extension that runs first carries its own copy of these
+   * lists - it starts before anything can hand it filters.js. Editing one
+   * copy and not the other is how you end up with new filters that quietly
+   * do nothing, so both are written together or neither is. */
+  sync();
 
   fs.rmSync(backup);
   console.log(`\n  Added ${total} filter(s) to src/filters/filters.js\n`);

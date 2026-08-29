@@ -18,9 +18,13 @@ REM ===========================================================
 cd /d "%~dp0"
 title AdCuck - sending your filters
 
-REM The two files the published filter list is built from.
+REM The files the filter list is built from. interceptor.js is in here
+REM because the part of the extension that runs first carries its own
+REM copy of the ad field names - 1-get-filters.bat updates both together,
+REM so they must travel together too.
 set "F1=src/filters/filters.js"
 set "F2=rules/network.json"
+set "F3=src/inject/interceptor.js"
 
 echo.
 echo  ============================================
@@ -56,6 +60,8 @@ for /f "tokens=1,* delims= " %%a in ('git status --porcelain') do (
     set "FILTERS=1"
   ) else if "!P!"=="%F2%" (
     set "FILTERS=1"
+  ) else if "!P!"=="%F3%" (
+    set "FILTERS=1"
   ) else (
     set "OTHERS=1"
   )
@@ -74,7 +80,7 @@ if not defined FILTERS if not defined OTHERS (
 if defined FILTERS (
   echo  Filters changed - these are what people receive:
   echo.
-  git status --short -- "%F1%" "%F2%"
+  git status --short -- "%F1%" "%F2%" "%F3%"
   echo.
 ) else (
   echo  The filter files have not changed.
@@ -88,7 +94,7 @@ if defined OTHERS (
   echo.
   for /f "tokens=1,* delims= " %%a in ('git status --porcelain') do (
     set "P=%%b"
-    if not "!P!"=="%F1%" if not "!P!"=="%F2%" echo      !P!
+    if not "!P!"=="%F1%" if not "!P!"=="%F2%" if not "!P!"=="%F3%" echo      !P!
   )
   echo.
   choice /c YN /n /m "  Include those as well? [Y/N] "
@@ -127,7 +133,7 @@ echo  Saving...
 if defined SENDOTHERS (
   git add -A
 ) else (
-  git add -- "%F1%" "%F2%"
+  git add -- "%F1%" "%F2%" "%F3%"
 )
 
 git commit -m "!MSG!"
