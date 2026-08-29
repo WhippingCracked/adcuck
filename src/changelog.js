@@ -14,6 +14,11 @@
  */
 var CHANGELOG = [
   {
+    version: "1.7.2",
+    date: "29 Aug 2026",
+    changes: ["Filters now check for updates every hour."]
+  },
+  {
     version: "1.7.1",
     date: "29 Aug 2026",
     changes: ["Filters now come from the right place."]

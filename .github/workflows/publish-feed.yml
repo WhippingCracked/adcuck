@@ -1,6 +1,6 @@
 ## Publishes the filter feed to GitHub Pages.
 ##
-## The extension reads <pages-url>/v1/manifest.json every six hours, so
+## The extension reads <pages-url>/v1/manifest.json every hour, so
 ## anything merged here reaches users without a store release. Set the same
 ## URL as `feedUrl` in the extension (or edit DEFAULT_FEED in
 ## src/background/updater.js) once Pages is enabled on this repo.

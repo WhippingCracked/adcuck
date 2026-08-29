@@ -45,6 +45,20 @@ would let a frame of page script run before we know blocking is paused.
 returns the untouched original on error. A blocker that throws inside
 `JSON.parse` does not show ads — it shows a black page.
 
+## The three buttons
+
+If you would rather not use a terminal, double-click these in order:
+
+| File | What it does |
+|---|---|
+| `1-get-filters.bat` | Opens YouTube, watches for ads you are not blocking yet, writes them to `feed/discovered.json` |
+| `2-check.bat` | Runs every test. Tells you plainly whether it is safe to send out |
+| `3-send-it.bat` | Saves your changes and pushes them to GitHub, which publishes the new list |
+
+They install what they need on first run, so `1` and `2` will take a few
+minutes the first time and seconds afterwards. Everything below is the same
+thing from a terminal.
+
 ## Getting set up
 
 You need **Node 20 or newer** ([nodejs.org](https://nodejs.org), take the LTS
@@ -157,7 +171,7 @@ something starts leaking through.
 ## Over-the-air filter updates
 
 Filters update themselves without a store release. The extension reads a static
-JSON feed on GitHub Pages every six hours, on browser start, and whenever you
+JSON feed on GitHub Pages every hour, on browser start, and whenever you
 press **Check now** in the popup.
 
 **The rule that makes this legal:** the feed carries *parameters* — selector
@@ -199,7 +213,7 @@ same version to different content, and clients skip a version they already have.
    outright, and **no fetched rule may block a page's main frame** — the one
    thing a hostile or broken feed could do that would really hurt.
 5. Applies atomically and keeps the previous list for rollback.
-6. On failure: backs off 6h → 12h → 24h and keeps blocking with the last good
+6. On failure: backs off 1h → 3h → 6h and keeps blocking with the last good
    list throughout. A failed refresh is not an outage, and the popup says so in
    a tooltip rather than a red banner.
 

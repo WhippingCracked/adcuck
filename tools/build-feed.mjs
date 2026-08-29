@@ -113,7 +113,7 @@ fs.writeFileSync(
 code{background:#f2f2f2;padding:2px 5px;border-radius:4px}</style>
 <h1>AdCuck filter feed</h1>
 <p>Current list: <code>${version}</code>, built ${manifest.generatedAt}.</p>
-<p>The extension reads <code>v1/manifest.json</code> from here every six hours.
+<p>The extension reads <code>v1/manifest.json</code> from here every hour.
 It carries selector strings and field names only - never code.</p>
 <p><a href="v1/manifest.json">v1/manifest.json</a></p>\n`
 );

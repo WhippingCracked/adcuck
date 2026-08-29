@@ -13,8 +13,10 @@
 
 const DEFAULT_FEED = "https://whippingcracked.github.io/adcuck/v1/manifest.json";
 const ALARM = "adcuck-filters";
-const PERIOD_MIN = 360;          // 6 hours
-const BACKOFF = [6, 12, 24];     // hours, after consecutive failures
+const PERIOD_MIN = 60;           // 1 hour
+/* Backoff after repeated failures. Kept short to match the hourly cadence -
+ * a 6-hour first backoff would mean one blip costs six missed checks. */
+const BACKOFF = [1, 3, 6];       // hours
 const RULE_ID_MIN = 1000;        // dynamic rules live above the static ones
 const RULE_ID_MAX = 9999;
 const MAX_BYTES = 512 * 1024;    // a YouTube-only list has no business being bigger
