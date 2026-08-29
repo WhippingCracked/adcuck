@@ -48,7 +48,9 @@ var CB_FILTERS = {
     "ytd-rich-section-renderer:has(ytd-brand-video-shelf-renderer)",
     "ytd-rich-section-renderer:has(ytd-brand-video-singleton-renderer)",
     "tp-yt-paper-dialog:has(ytd-enforcement-message-view-model)",
-    "ytd-popup-container:has(ytd-enforcement-message-view-model)"
+    "ytd-popup-container:has(ytd-enforcement-message-view-model)",
+    "ytd-masthead",
+    "yt-progress-bar-playhead"
   ],
 
   /* Physically removed from the DOM. Reserved for nodes that hold the page
@@ -95,7 +97,14 @@ var CB_FILTERS = {
       "adsEngagementPanelRenderer",
       "mealbarPromoRenderer",
       "brandVideoShelfRenderer",
-      "brandVideoSingletonRenderer"
+      "brandVideoSingletonRenderer",
+      "menuServiceItemDownloadRenderer",
+      "adImageViewModel",
+      "adBadgeViewModel",
+      "adDetailsLineViewModel",
+      "adButtonHoverOverlayViewModel",
+      "adButtonViewModel",
+      "adPlacementRenderer"
     ],
     adGateReasons: [
       "Ad blockers are not allowed on YouTube",
