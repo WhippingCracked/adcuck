@@ -54,7 +54,7 @@ If you would rather not use a terminal, double-click these in order:
 |---|---|
 | `1-get-filters.bat` | Opens YouTube, watches for ads you are not blocking yet, writes them to `feed/discovered.json` |
 | `2-check.bat` | Runs every test. Tells you plainly whether it is safe to send out |
-| `3-send-it.bat` | Saves your changes and pushes them to GitHub, which publishes the new list |
+| `3-send-it.bat` | Sends **just the filter files** to GitHub, which republishes the list. Anything else you have been editing is listed and left alone unless you say otherwise |
 | `4-make-zip.bat` | Packs just the extension files into `adcuck-<version>.zip` for the Chrome Web Store |
 
 They install what they need on first run, so `1` and `2` will take a few
@@ -217,6 +217,23 @@ strings, field names, rule objects. The engine that reads them ships in the
 package and never comes from the network. Fetching a JavaScript function would
 breach MV3's remote-code ban however it was encoded, and that is the fastest
 route to removal from the store.
+
+### What actually reaches people
+
+Two different things, easy to conflate:
+
+- **The repository** holds the whole project — code, tests, tools, notes. It
+  has to, because GitHub Actions builds the feed *from* that source. A repo
+  containing only filters could not build anything.
+- **What gets published**, and therefore what anyone's browser ever downloads,
+  is only `feed/` — three small JSON files. The workflow uploads that folder
+  and nothing else (`upload-pages-artifact` with `path: feed`), so the rest of
+  the repo is never served.
+
+`3-send-it.bat` commits only `src/filters/filters.js` and `rules/network.json`
+by default. Other edits are listed and left on your machine unless you say to
+include them, so a half-finished change to the popup cannot ride along with a
+filter fix.
 
 ### Setting it up
 
