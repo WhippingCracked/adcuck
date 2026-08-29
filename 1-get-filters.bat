@@ -49,11 +49,26 @@ if not exist "node_modules\playwright" (
   echo.
 )
 
+REM --- Which video to watch ---------------------------------
+REM  Most YouTube ads only exist while a video is playing, so
+REM  this opens a video and sits through the advert. Pasting a
+REM  link lets you point it at one you know shows ads.
+echo  Paste a YouTube video link and press Enter.
+echo  ^(or just press Enter to use the usual pages^)
+echo.
+set "LINK="
+set /p "LINK=  Link: "
+echo.
+
 echo  A browser window will open. Leave it alone - it closes
 echo  by itself when it is done. Takes about a minute.
 echo.
 
-call node tools/discover.mjs
+if defined LINK (
+  call node tools/discover.mjs "%LINK%"
+) else (
+  call node tools/discover.mjs
+)
 if errorlevel 1 (
   echo.
   echo  [X] Something went wrong. The message above says what.

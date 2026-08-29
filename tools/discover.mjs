@@ -1,120 +1,166 @@
 #!/usr/bin/env node
 /* Find filters instead of inventing them.
  *
- *   node tools/discover.mjs                        # a default set of pages
+ *   node tools/discover.mjs                        # a video, then the feeds
  *   node tools/discover.mjs https://www.youtube.com/watch?v=… …
  *
  * Loads real YouTube pages in a real browser, captures every player/browse
  * response and the live DOM, and reports the ad-shaped things it saw that the
- * current filter list does NOT cover. Output is a JSON block ready to paste
- * into src/filters/filters.js.
+ * current filter list does NOT cover. It writes feed/discovered.json, which
+ * tools/add-filters.mjs then walks you through one at a time.
  *
- * Why this exists: hand-guessing renderer names ages badly, and YouTube renames
- * them freely. Reading what actually came down the wire is the only way to keep
- * a list honest. Run it monthly, or whenever something starts leaking through.
+ * Why this exists: hand-guessing renderer names ages badly, and YouTube
+ * renames them freely. Reading what actually came down the wire is the only
+ * way to keep a list honest. Run it monthly, or whenever something starts
+ * leaking through.
  *
- * It reads only; it changes nothing. Nothing is applied without you looking at
- * it first, because a filter list is exactly the kind of thing that should not
- * be updated by a machine unattended.
+ * A watch page comes first on purpose. The ads worth catching - the pre-roll,
+ * the skip button, the banner across the bottom of the player - only exist
+ * while a video is actually playing. A run that never opened a video was only
+ * ever seeing the smaller banner-and-promo family that lives on the feeds.
+ *
+ * What counts as ad-shaped lives in discover-match.mjs, where it can be
+ * tested without a browser. This file is only the browser driving.
+ *
+ * It reads only; it changes nothing.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { knownFrom, collectKeys, collectDom } from "./discover-match.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const PAGES = process.argv.slice(2).length
-  ? process.argv.slice(2)
-  : [
-      "https://www.youtube.com/",
-      "https://www.youtube.com/feed/trending",
-      "https://www.youtube.com/results?search_query=news"
-    ];
+/* A video first, because that is where the ads are. The feeds afterwards
+ * catch the banner/promo family, which never appears on a watch page. */
+const DEFAULT_PAGES = [
+  "https://www.youtube.com/watch?v=mehJEqGjFAQ",
+  "https://www.youtube.com/",
+  "https://www.youtube.com/results?search_query=news"
+];
 
-/* Anything whose name reads like an advert. Deliberately wide - this is a
- * candidate list for a human to filter, not something applied automatically. */
-const SUSPECT = /(^|[A-Za-z])(ad|ads|advert|promo|promoted|sponsor|masthead|payment|premium|mealbar|enforcement)([A-Z]|$)/;
-const RENDERER = /(Renderer|ViewModel)$/;
+const PAGES = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_PAGES;
+const isWatch = (u) => /[?&]v=|\/shorts\//.test(u);
 
 function loadCurrent() {
   const src = fs.readFileSync(path.join(ROOT, "src/filters/filters.js"), "utf8");
   return new Function("var globalThis = {};" + src + "\nreturn CB_FILTERS;")();
 }
 
-const F = loadCurrent();
-const known = new Set([...F.response.adMarkers, ...F.response.playerKeys]);
-const knownTags = new Set(
-  F.hide.concat(F.remove).map((s) => s.toLowerCase().replace(/[[:.].*$/, ""))
-);
+const known = knownFrom(loadCurrent());
 
-const seenKeys = new Map();   // renderer name -> times seen
-const seenTags = new Map();   // element name  -> times seen
-const samples = new Map();    // renderer name -> one small example
+const seenKeys = new Map();     // renderer name -> times seen
+const seenTags = new Map();     // element name  -> most seen at once
+const seenClasses = new Map();  // class name    -> most seen at once
+const samples = new Map();      // renderer name -> one small example
 
-function walk(node, depth) {
-  if (!node || typeof node !== "object" || depth > 20) return;
-  if (Array.isArray(node)) {
-    for (const item of node) walk(item, depth + 1);
-    return;
+/* Runs inside the page. Returns every custom element name and every class
+ * currently in the DOM, with counts; the deciding happens out here. */
+function scrapeDom() {
+  const tags = {};
+  const classes = {};
+  for (const el of document.querySelectorAll("*")) {
+    const t = el.tagName.toLowerCase();
+    if (t.includes("-")) tags[t] = (tags[t] || 0) + 1;
+    const cl = el.getAttribute("class");
+    if (!cl) continue;
+    for (const c of cl.split(/\s+/)) if (c) classes[c] = (classes[c] || 0) + 1;
   }
-  for (const [k, v] of Object.entries(node)) {
-    if ((RENDERER.test(k) || k.endsWith("Params")) && SUSPECT.test(k) && !known.has(k)) {
-      seenKeys.set(k, (seenKeys.get(k) || 0) + 1);
-      if (!samples.has(k)) {
-        const s = JSON.stringify(v);
-        samples.set(k, s.length > 220 ? s.slice(0, 220) + "…" : s);
-      }
-    }
-    walk(v, depth + 1);
-  }
+  return { tags, classes };
 }
 
-const browser = await chromium.launch({ headless: false, args: ["--no-sandbox"] });
+/* ------------------------------------------------------------------ *
+ * The cookie wall
+ *
+ * A brand new browser profile in the UK or EU lands on consent.youtube.com
+ * and never reaches YouTube at all, so the run finds nothing and cannot say
+ * why. Answer it the privacy-preserving way - Reject all - and if that button
+ * is not there, say so plainly rather than reporting an empty result.
+ * ------------------------------------------------------------------ */
+const onConsent = (page) => /consent\.|\/consent/.test(page.url());
+
+async function clearCookieWall(page) {
+  if (!onConsent(page)) return true;
+  process.stdout.write("  cookie wall - choosing Reject all\n");
+  for (const name of [/^Reject all$/i, /^Reject$/i, /^Decline$/i]) {
+    try {
+      const b = page.getByRole("button", { name }).first();
+      if (await b.isVisible({ timeout: 1500 })) {
+        await b.click();
+        await page.waitForLoadState("domcontentloaded", { timeout: 15000 });
+        return !onConsent(page);
+      }
+    } catch (e) {
+      /* not this variant of the page */
+    }
+  }
+  return false;
+}
+
+/* ------------------------------------------------------------------ */
+
+const browser = await chromium.launch({
+  headless: false,
+  args: [
+    "--no-sandbox",
+    /* Without this the pre-roll never starts, and an ad that never plays is
+     * an ad we never see. Muted so it is not startling. */
+    "--autoplay-policy=no-user-gesture-required",
+    "--mute-audio"
+  ]
+});
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 
 page.on("response", async (res) => {
-  const url = res.url();
-  if (!/\/youtubei\/v1\/(player|browse|next|search)/.test(url)) return;
+  if (!/\/youtubei\/v1\/(player|browse|next|search|reel)/.test(res.url())) return;
   try {
-    walk(await res.json(), 0);
+    collectKeys(await res.json(), known, seenKeys, samples);
   } catch (e) {
-    /* not JSON, or already consumed */
+    /* not JSON, or the page went away mid-flight */
   }
 });
 
 for (const url of PAGES) {
-  process.stdout.write(`visiting ${url}\n`);
+  const watch = isWatch(url);
+  process.stdout.write(`visiting ${url}${watch ? "  (watching for ads)" : ""}\n`);
   try {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
-    await page.waitForTimeout(4000);
-    await page.mouse.wheel(0, 4000);
-    await page.waitForTimeout(3000);
+
+    if (!(await clearCookieWall(page))) {
+      console.error("  stuck on the cookie page - skipping this one");
+      continue;
+    }
+    await page.waitForTimeout(2500);
+
+    if (watch) {
+      /* Ask the player to start. Pre-rolls are the whole reason for opening a
+       * watch page, and they do not exist until playback begins. */
+      await page.evaluate(() => {
+        const v = document.querySelector("video");
+        if (v && v.paused) v.play().catch(() => {});
+      });
+    }
+
+    /* Ad overlays appear and vanish - the skip button lives for five seconds,
+     * the banner goes when you dismiss it. A single snapshot at the end would
+     * miss every one of them, so sample repeatedly and keep the union. */
+    const rounds = watch ? 12 : 4;
+    for (let i = 0; i < rounds; i++) {
+      collectDom(await page.evaluate(scrapeDom), known, seenTags, seenClasses);
+      if (!watch && i === 1) await page.mouse.wheel(0, 4000);
+      await page.waitForTimeout(1500);
+    }
+    collectDom(await page.evaluate(scrapeDom), known, seenTags, seenClasses);
 
     /* The inline bootstrap payloads never travel as a response. */
     const inline = await page.evaluate(() => ({
       player: window.ytInitialPlayerResponse || null,
       data: window.ytInitialData || null
     }));
-    walk(inline.player, 0);
-    walk(inline.data, 0);
-
-    /* And whatever ad-shaped custom elements actually rendered. */
-    const tags = await page.evaluate(() => {
-      const out = {};
-      for (const el of document.querySelectorAll("*")) {
-        const t = el.tagName.toLowerCase();
-        if (!t.includes("-")) continue;
-        out[t] = (out[t] || 0) + 1;
-      }
-      return out;
-    });
-    for (const [tag, n] of Object.entries(tags)) {
-      if (!SUSPECT.test(tag.replace(/-/g, "")) ) continue;
-      if (knownTags.has(tag)) continue;
-      seenTags.set(tag, (seenTags.get(tag) || 0) + n);
-    }
+    collectKeys(inline.player, known, seenKeys, samples);
+    collectKeys(inline.data, known, seenKeys, samples);
   } catch (e) {
     console.error(`  failed: ${e.message}`);
   }
@@ -132,17 +178,22 @@ for (const [k, n] of byCount(seenKeys)) {
 }
 
 console.log("\n=== elements not in the current list ===");
-if (!seenTags.size) console.log("  none");
+if (!seenTags.size && !seenClasses.size) console.log("  none");
 for (const [t, n] of byCount(seenTags)) console.log(`  ${String(n).padStart(4)}x  ${t}`);
+for (const [c, n] of byCount(seenClasses)) console.log(`  ${String(n).padStart(4)}x  .${c}`);
 
 const proposal = {
   adMarkers: byCount(seenKeys).map(([k]) => k),
-  hide: byCount(seenTags).map(([t]) => t)
+  hide: [
+    ...byCount(seenTags).map(([t]) => t),
+    ...byCount(seenClasses).map(([c]) => `.${c}`)
+  ]
 };
 const outFile = path.join(ROOT, "feed", "discovered.json");
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, JSON.stringify(proposal, null, 2) + "\n");
 
-console.log(`\nwrote ${path.relative(ROOT, outFile)}`);
-console.log("Read it before using it. Every entry is a guess until you have");
-console.log("checked what it actually is - some of these will be real content.");
+const total = proposal.adMarkers.length + proposal.hide.length;
+console.log(`\nwrote ${path.relative(ROOT, outFile)} - ${total} candidate(s)`);
+console.log("Every entry is a guess until you have looked at it. Run");
+console.log("add-filters.mjs next and it will ask you about each one.");

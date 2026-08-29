@@ -4,8 +4,8 @@
   "private": true,
   "description": "YouTube ad blocker for Chrome (Manifest V3). Made by Archie.",
   "scripts": {
-    "test": "node tools/build-feed.mjs && node test/sponsors.mjs && node test/e2e.mjs && node test/bench.mjs",
-    "test:ci": "node tools/build-feed.mjs && node test/sponsors.mjs && xvfb-run -a node test/e2e.mjs && node test/bench.mjs",
+    "test": "node tools/build-feed.mjs && node test/discover.mjs && node test/sponsors.mjs && node test/e2e.mjs && node test/bench.mjs",
+    "test:ci": "node tools/build-feed.mjs && node test/discover.mjs && node test/sponsors.mjs && xvfb-run -a node test/e2e.mjs && node test/bench.mjs",
     "bench": "node test/bench.mjs",
     "feed": "node tools/build-feed.mjs",
     "discover": "node tools/discover.mjs",
