@@ -14,6 +14,14 @@
  */
 var CHANGELOG = [
   {
+    version: "1.8.0",
+    date: "29 Aug 2026",
+    changes: [
+      "Can now skip sponsor bits inside videos.",
+      "Off until you switch it on in the popup."
+    ]
+  },
+  {
     version: "1.7.3",
     date: "29 Aug 2026",
     changes: ["Check now tells you whether the filters changed."]

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AdCuck",
-  "version": "1.7.3",
+  "version": "1.8.0",
   "description": "Blocks ads on YouTube - video ad breaks, banners and in-feed promos. One toggle, light and dark.",
   "minimum_chrome_version": "120",
   "icons": {
@@ -32,7 +32,8 @@
   "host_permissions": [
     "*://*.youtube.com/*",
     "*://*.youtube-nocookie.com/*",
-    "https://*.github.io/*"
+    "https://*.github.io/*",
+    "https://sponsor.ajay.app/*"
   ],
   "declarative_net_request": {
     "rule_resources": [
@@ -77,7 +78,8 @@
       "js": [
         "src/filters/filters.js",
         "src/content/cosmetic.js",
-        "src/content/watchdog.js"
+        "src/content/watchdog.js",
+        "src/content/sponsors.js"
       ],
       "run_at": "document_start",
       "all_frames": true,

@@ -81,6 +81,21 @@ const INITIAL_DATA = {
   }
 };
 
+/* A real 20-second clip, so the sponsor skip can be tested by actually
+ * playing something rather than by trusting the code. 3KB of black frames. */
+const CLIP_B64 = "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WC/0AAiOgACjloEBkADRAQABEBAAGAAYWC/0AAiOgACjloECWADRAQABEBAAGAAYWC/0AAiOgACjloEDIADRAQABEBAAGAAYWC/0AAiOgACjloED6ADRAQABEBAAGAAYWC/0AAiOgACjloEEsADRAQABEBAAGAAYWC/0AAiOgACjloEFeADRAQABEBAAGAAYWC/0AAiOgACjloEGQADRAQABEBAAGAAYWC/0AAiOgACjloEHCADRAQABEBAAGAAYWC/0AAiOgACjloEH0ADRAQABEBAUYABhYL/QACI6AACjloEImADRAQABEBAAGAAYWC/0AAiOgACjloEJYADRAQABEBAAGAAYWC/0AAiOgACjloEKKADRAQABEBAAGAAYWC/0AAiOgACjloEK8ADRAQABEBAAGAAYWC/0AAiOgACjloELuADRAQABEBAAGAAYWC/0AAiOgACjloEMgADRAQABEBAAGAAYWC/0AAiOgACjloENSADRAQABEBAAGAAYWC/0AAiOgACjloEOEADRAQABEBAAGAAYWC/0AAiOgACjloEO2ADRAQABEBAAGAAYWC/0AAiOgACjloEPoADRAQABEBAAGAAYWC/0AAiOgACjloEQaADRAQABEBAUYABhYL/QACI6AACjloERMADRAQABEBAAGAAYWC/0AAiOgACjloER+ADRAQABEBAAGAAYWC/0AAiOgACjloESwADRAQABEBAAGAAYWC/0AAiOgACjloETiADRAQABEBAAGAAYWC/0AAiOgAAfQ7Z1QhTngjzwo5aBAAAA0QEAARAQABgAGFgv9AAIjoAAo5aBAMgA0QEAARAQABgAGFgv9AAIjoAAo5aBAZAA0QEAARAQABgAGFgv9AAIjoAAo5aBAlgA0QEAARAQABgAGFgv9AAIjoAAo5aBAyAA0QEAARAQABgAGFgv9AAIjoAAo5aBA+gA0QEAARAQABgAGFgv9AAIjoAAo5aBBLAA0QEAARAQFGAAYWC/0AAiOgAAo5aBBXgA0QEAARAQABgAGFgv9AAIjoAAo5aBBkAA0QEAARAQABgAGFgv9AAIjoAAo5aBBwgA0QEAARAQABgAGFgv9AAIjoAAo5aBB9AA0QEAARAQABgAGFgv9AAIjoAAo5aBCJgA0QEAARAQABgAGFgv9AAIjoAAo5aBCWAA0QEAARAQABgAGFgv9AAIjoAAo5aBCigA0QEAARAQABgAGFgv9AAIjoAAo5aBCvAA0QEAARAQABgAGFgv9AAIjoAAo5aBC7gA0QEAARAQABgAGFgv9AAIjoAAo5aBDIAA0QEAARAQABgAGFgv9AAIjoAAo5aBDUgA0QEAARAQFGAAYWC/0AAiOgAAo5aBDhAA0QEAARAQABgAGFgv9AAIjoAAo5aBDtgA0QEAARAQABgAGFgv9AAIjoAAo5aBD6AA0QEAARAQABgAGFgv9AAIjoAAo5aBEGgA0QEAARAQABgAGFgv9AAIjoAAHFO7a5G7j7OBALeK94EB8YIBn/CBAw==";
+
+const SB_SEGMENTS = [
+  {
+    videoID: "dQw4w9WgXcQ",
+    segments: [
+      { UUID: "seg-1", segment: [4, 12], category: "sponsor", votes: 5, actionType: "skip" },
+      { UUID: "seg-2", segment: [30, 40], category: "music_offtopic", votes: 2, actionType: "skip" }
+    ]
+  },
+  { videoID: "someOtherVideo", segments: [{ UUID: "x", segment: [0, 99], category: "sponsor", votes: 1 }] }
+];
+
 const PAGE = `<!doctype html><html><head><title>Test - YouTube</title></head><body>
 <ytd-app>
   <ytd-masthead><div id="end"><div id="buttons">avatar</div></div></ytd-masthead>
@@ -88,7 +103,7 @@ const PAGE = `<!doctype html><html><head><title>Test - YouTube</title></head><bo
   <ytd-ad-slot-renderer id="feedad">FEED AD</ytd-ad-slot-renderer>
   <ytd-rich-item-renderer id="richad"><ytd-ad-slot-renderer></ytd-ad-slot-renderer></ytd-rich-item-renderer>
   <ytd-video-renderer id="realvideo">REAL VIDEO</ytd-video-renderer>
-  <div id="movie_player" class="ad-showing"><video id="v"></video></div>
+  <div id="movie_player" class="ad-showing"><video id="v" src="/clip.webm" muted></video></div>
   <tp-yt-paper-toast id="toastmsg">Experiencing interruptions? Find out why.</tp-yt-paper-toast>
   <tp-yt-paper-toast id="toastok">Added to queue</tp-yt-paper-toast>
 </ytd-app>
@@ -216,8 +231,25 @@ const ctx = await chromium.launchPersistentContext(userDataDir, {
 
 // Serve the synthetic page (and a synthetic innertube endpoint) at the real
 // origin so the manifest's match patterns apply.
+const sbRequests = [];
+await ctx.route("**sponsor.ajay.app**", async (route) => {
+  sbRequests.push(route.request().url());
+  return route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(SB_SEGMENTS)
+  });
+});
+
 await ctx.route("**://*.youtube.com/**", async (route) => {
   const url = route.request().url();
+  if (url.includes("/clip.webm")) {
+    return route.fulfill({
+      status: 200,
+      contentType: "video/webm",
+      body: Buffer.from(CLIP_B64, "base64")
+    });
+  }
   if (url.includes("gated=1")) {
     return route.fulfill({
       status: 200,
@@ -586,13 +618,22 @@ if (sw) {
   );
   check("Measured cost reaches the service worker", cost === 12.3, `${cost}ms`);
 
-  await sw.evaluate(() =>
-    chrome.storage.session.set({
-      lastStartMs: 3400,
-      lastStartNudges: 2,
-      lastCostMs: 12.3,
-      lastTrace: "rs0 11.2s -> rs4 playing"
-    })
+  /* The fixture is a real 20-second clip, so this is a genuine end-to-end
+   * measurement rather than a number we put there ourselves. */
+  const measured = await sw.evaluate(() =>
+    chrome.storage.session
+      .get({ lastStartMs: 0, lastTrace: "" })
+      .then((r) => r)
+  );
+  check(
+    "A real video's start time is measured",
+    measured.lastStartMs > 0 && measured.lastStartMs < 30000,
+    `${measured.lastStartMs}ms`
+  );
+  check(
+    "...and the stall trace records the player state",
+    /rs\d/.test(measured.lastTrace),
+    measured.lastTrace
   );
 
   /* The bisect switches must actually reach the layers they name. */
@@ -649,6 +690,18 @@ if (sw) {
 
 /* --- popup renders in both themes -------------------------------------- */
 if (extId) {
+  /* Fixed values so the popup's formatting can be checked exactly. Set here,
+   * immediately before the popup opens, because the watchdog writes real ones
+   * every time the page reloads. */
+  await ctx.serviceWorkers()[0]?.evaluate(() =>
+    chrome.storage.session.set({
+      lastStartMs: 3400,
+      lastStartNudges: 2,
+      lastCostMs: 12.3,
+      lastTrace: "rs0 11.2s -> rs4 playing"
+    })
+  );
+
   const popup = await ctx.newPage();
   const shots = path.join(ROOT, "test", "screenshots");
   fs.mkdirSync(shots, { recursive: true });
@@ -680,6 +733,58 @@ if (extId) {
     "Channel row is hidden when there is no channel",
     popupOk.channelRowShown === false
   );
+
+  /* ---------------- sponsor segments ----------------
+   * Only the opt-in gate is checked here. The lookup itself is unit-tested in
+   * test/sponsors.mjs, because this harness cannot intercept a service
+   * worker's network calls - a test that cannot fail is worse than none. */
+  const sbOffResult = await popup.evaluate(
+    () => new Promise((r) =>
+      chrome.runtime.sendMessage({ type: "cb:segments", videoId: "dQw4w9WgXcQ" }, r))
+  );
+  check(
+    "No sponsor lookup happens until it is switched on",
+    Array.isArray(sbOffResult.segments) && sbOffResult.segments.length === 0 && sbRequests.length === 0,
+    `${sbRequests.length} requests`
+  );
+
+  /* --- sponsor toggle and its licence credit ------------------------ */
+  const sponsorUi = await popup.evaluate(() => {
+    const tgl = document.getElementById("tglSponsor");
+    return {
+      exists: !!tgl,
+      inMainView: !!document.getElementById("main").contains(tgl),
+      checked: tgl.getAttribute("aria-checked"),
+      creditHidden: document.getElementById("sponsorCredit").hidden,
+      creditText: document.getElementById("sponsorCredit").textContent.trim(),
+      creditLink: document.querySelector("#sponsorCredit a")?.href || ""
+    };
+  });
+  check("Sponsor skipping has a switch in the main view", sponsorUi.exists && sponsorUi.inMainView);
+  check("...off until asked for", sponsorUi.checked === "false", sponsorUi.checked);
+  check("...with the credit hidden while unused", sponsorUi.creditHidden === true);
+  check(
+    "The credit names SponsorBlock and links to it",
+    /SponsorBlock/.test(sponsorUi.creditText) && /sponsor\.ajay\.app/.test(sponsorUi.creditLink),
+    sponsorUi.creditLink
+  );
+
+  /* Turning it on must show the credit (a licence condition) and warn about
+   * the refresh rather than just doing it. */
+  await popup.click("#tglSponsor");
+  await popup.waitForTimeout(300);
+  const afterToggle = await popup.evaluate(() => ({
+    checked: document.getElementById("tglSponsor").getAttribute("aria-checked"),
+    creditShown: !document.getElementById("sponsorCredit").hidden,
+    noteShown: !document.getElementById("reloadNote").hidden,
+    note: document.getElementById("reloadMeta").textContent
+  }));
+  check("Switching it on flips the switch", afterToggle.checked === "true");
+  check("...shows the credit, as the licence requires", afterToggle.creditShown === true);
+  check("...and warns before refreshing", afterToggle.noteShown && /refresh/i.test(afterToggle.note), afterToggle.note);
+  check("...counting down rather than jumping", /\d/.test(afterToggle.note), afterToggle.note);
+
+  await popup.evaluate(() => chrome.storage.sync.set({ sponsorBlock: false }));
 
   /* --- filter status row -------------------------------------------- */
   const filterRow = await popup.evaluate(() => ({

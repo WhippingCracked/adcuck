@@ -33,6 +33,7 @@ layers, each independently toggleable and each failing open.
 | **L2** | `src/inject/interceptor.js` | **The engine.** A `MAIN`-world script at `document_start` that intercepts the player response and deletes `adPlacements`, `playerAds`, `adSlots` and `adBreakHeartbeatParams` before the player sees them. This is what removes pre-rolls and mid-rolls. |
 | **L2e** | `src/inject/interceptor.js` | **Enforcement.** Removes the "Experiencing interruptions?" / "Ad blockers are not allowed" payload. |
 | **L3** | `src/content/cosmetic.js` | Stylesheet + `MutationObserver` for banners, in-feed promos, overlays, and the anti-adblock dialog. |
+| **L5** | `src/content/sponsors.js` | **Sponsor reads.** Advertising baked into the video itself, skipped using timings from SponsorBlock. Off by default. |
 | **L4** | `src/content/watchdog.js` | Safety net. If an ad plays anyway, mute, click skip, or seek the ad clip to its end. |
 
 `src/content/bridge.js` connects the two worlds: the interceptor runs in the
@@ -91,7 +92,8 @@ Loads the unpacked extension into Chromium and serves a synthetic YouTube page
 at the real origin (so the content scripts actually match), then asserts each
 layer's behaviour: ads stripped, real content untouched, the pause toggle
 genuinely stopping every layer, the channel allowlist honoured, both popup
-themes painting, and no uncaught errors. 92 checks. Screenshots of the popup
+themes painting, and no uncaught errors. 111 checks, plus 17 in
+`test/sponsors.mjs`. Screenshots of the popup
 land in `test/screenshots/`.
 
 `test/bench.mjs` measures the thing that decides how fast YouTube feels. The
@@ -134,6 +136,32 @@ never "replaced the quadratic enforcement scan".
 Users open it with the **What's new** button in the popup footer. A small dot
 sits on that button after an update until they open it once. The version
 beside it is a plain label.
+
+## Sponsor segments
+
+Sponsor reads live inside the video file, so no other layer can touch them.
+The timings come from [SponsorBlock](https://sponsor.ajay.app/), a list people
+submit and vote on. **Off by default** — it contacts a third party, which is
+not something to switch on for someone without asking.
+
+**The video id never leaves the machine.** It is hashed, and only the first
+four characters are sent. That bucket holds thousands of videos, so the server
+cannot tell which one is playing; the right one is picked out locally. There
+are unit tests asserting the id never appears in the request URL, because that
+is the one property worth proving rather than assuming.
+
+Only categories that are genuinely advertising are skipped — `sponsor`,
+`selfpromo`, `interaction`. Intros, outros and filler are the creator's own
+video, and skipping those by default would surprise people. The list lives in
+`filters.js`, so it ships through the update feed.
+
+**Attribution is a licence condition, not a courtesy.** The database is
+CC BY-NC-SA 4.0, so the popup credits SponsorBlock whenever the feature is on,
+and AdCuck must never be used commercially while it does.
+
+`test/sponsors.mjs` covers the lookup outside the browser on purpose: the
+browser harness cannot intercept a service worker's network calls, so a test
+there could not fail and would have been worse than none.
 
 ## Where the filters come from
 

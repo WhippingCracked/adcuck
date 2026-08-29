@@ -104,6 +104,16 @@ var CB_FILTERS = {
     ]
   },
 
+  /* Sponsor segments (SponsorBlock). Only the categories that are actually
+   * advertising - intros, outros and filler are the creator's own video and
+   * skipping them by default would surprise people. Feed-updatable, so the
+   * list can change without a store release. */
+  sponsors: {
+    categories: ["sponsor", "selfpromo", "interaction"],
+    actionTypes: ["skip"],
+    minVotes: 0
+  },
+
   /* Player state and controls used by the watchdog. */
   player: {
     container: "#movie_player",

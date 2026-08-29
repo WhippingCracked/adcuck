@@ -47,6 +47,27 @@
   <button id="checkNow" type="button" class="linkbtn">Check now</button>
 </div>
 
+<div class="row">
+  <button id="tglSponsor" type="button" class="sw sw--mini" role="switch"
+          aria-checked="false" aria-label="Skip sponsor bits in videos">
+    <span class="knob"></span>
+  </button>
+  <em>Skip sponsor bits in videos</em>
+</div>
+
+<!-- Attribution is a condition of the SponsorBlock licence (CC BY-NC-SA),
+     not a nicety. Shown whenever the feature is on. -->
+<div class="row" id="sponsorCredit" hidden>
+  <span class="meta">segment data by
+    <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a>
+  </span>
+</div>
+
+<div class="row" id="reloadNote" hidden>
+  <span class="dot" id="reloadDot"></span>
+  <span class="meta" id="reloadMeta"></span>
+</div>
+
 <div class="row" id="startRow" hidden>
   <span class="dot" id="startDot"></span>
   <span class="meta" id="startMeta"></span>
@@ -117,7 +138,7 @@
     <button id="whatsNew" class="newbtn" type="button">
       <span class="newdot" id="newDot" hidden></span>What's new
     </button>
-    <span id="verText">v1.7.3</span>
+    <span id="verText">v1.8.0</span>
   </span>
 </footer>
 

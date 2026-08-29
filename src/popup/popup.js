@@ -36,6 +36,10 @@
     dot: $("dot"),
     filterMeta: $("filterMeta"),
     checkNow: $("checkNow"),
+    tglSponsor: $("tglSponsor"),
+    sponsorCredit: $("sponsorCredit"),
+    reloadNote: $("reloadNote"),
+    reloadMeta: $("reloadMeta"),
     live: $("live")
   };
 
@@ -49,7 +53,8 @@
     netRules: true,
     videoAds: true,
     clamp: true,
-    adFree: true
+    adFree: true,
+    sponsorBlock: false
   };
   var state = {
     enabled: true,
@@ -251,6 +256,46 @@
     );
   });
 
+  /* ---------- sponsor segments ---------- */
+  function renderSponsor() {
+    els.tglSponsor.setAttribute("aria-checked", state.sponsorBlock ? "true" : "false");
+    /* The licence requires the credit while the data is in use. */
+    els.sponsorCredit.hidden = !state.sponsorBlock;
+  }
+
+  /* Switching this changes what the content scripts do at page load, so the
+   * open tab has to start again. Counting down out loud beats a page
+   * reloading under someone with no warning. */
+  function countdownReload() {
+    var left = 3;
+    els.reloadNote.hidden = false;
+    els.reloadMeta.textContent = "refreshing YouTube in " + left + "\u2026";
+    els.live.textContent = "YouTube will refresh in 3 seconds.";
+
+    var tick = setInterval(function () {
+      left--;
+      if (left > 0) {
+        els.reloadMeta.textContent = "refreshing YouTube in " + left + "\u2026";
+      } else {
+        clearInterval(tick);
+        els.reloadMeta.textContent = "refreshing\u2026";
+      }
+    }, 1000);
+
+    /* The service worker does the actual reload, so it still happens if the
+     * popup is closed before the count reaches zero. */
+    chrome.runtime.sendMessage({ type: "cb:reloadYouTube" }, function () {
+      void chrome.runtime.lastError;
+    });
+  }
+
+  els.tglSponsor.addEventListener("click", function () {
+    state.sponsorBlock = !state.sponsorBlock;
+    renderSponsor();
+    chrome.storage.sync.set({ sponsorBlock: state.sponsorBlock });
+    countdownReload();
+  });
+
   /* ---------- filter list ---------- */
   function ago(ms) {
     if (!ms) return "never checked";
@@ -345,6 +390,7 @@
     applyTheme(s.theme);
     renderDiag();
     renderLayers();
+    renderSponsor();
     renderMaster();
     renderChannel();
   });

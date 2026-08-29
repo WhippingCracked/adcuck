@@ -27,7 +27,8 @@
     diagnostics: false,
     clamp: true,
     videoAds: true,
-    adFree: true
+    adFree: true,
+    sponsorBlock: false
   };
   var root = document.documentElement;
   var channel = { id: "", name: "" };
@@ -86,6 +87,11 @@
     writeMirror(MIRROR_ADFREE, adFree);
 
     document.dispatchEvent(
+      new CustomEvent("__cb_sponsors", {
+        detail: { enabled: next === "on" && state.sponsorBlock === true }
+      })
+    );
+    document.dispatchEvent(
       new CustomEvent("__cb_state", { detail: { enabled: next === "on" } })
     );
   }
@@ -99,7 +105,8 @@
   chrome.storage.onChanged.addListener(function (changes, area) {
     if (area !== "sync") return;
     if (!changes.enabled && !changes.allowlist && !changes.diagnostics &&
-        !changes.clamp && !changes.videoAds && !changes.adFree) return;
+        !changes.clamp && !changes.videoAds && !changes.adFree &&
+        !changes.sponsorBlock) return;
     chrome.storage.sync.get(DEFAULTS, function (state) {
       if (chrome.runtime.lastError) return;
       apply(state);

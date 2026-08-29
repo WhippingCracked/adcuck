@@ -6,6 +6,7 @@
  */
 
 import { checkForUpdates, scheduleUpdates, onAlarm } from "./updater.js";
+import { sponsorSegments, DEFAULT_CFG } from "./sponsors.js";
 
 const RULESET = "youtube-ads";
 const DEFAULTS = {
@@ -15,6 +16,7 @@ const DEFAULTS = {
   diagnostics: false,
   feedUrl: "",
   clamp: true,
+  sponsorBlock: false,
   netRules: true,
   videoAds: true,
   adFree: true
@@ -130,6 +132,38 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
   if (msg.type === "cb:perf") {
     chrome.storage.session.set({ lastCostMs: Number(msg.ms) || 0 });
     return;
+  }
+
+  if (msg.type === "cb:segments") {
+    (async () => {
+      try {
+        const { sponsorBlock } = await chrome.storage.sync.get({ sponsorBlock: false });
+        if (!sponsorBlock) return respond({ segments: [] });
+        const { filters } = await chrome.storage.local.get({ filters: null });
+        const cfg =
+          (filters && filters.cosmetic && filters.cosmetic.sponsors) || DEFAULT_CFG;
+        respond({ segments: await sponsorSegments(String(msg.videoId || ""), cfg) });
+      } catch (e) {
+        respond({ segments: [], error: String(e && e.message ? e.message : e) });
+      }
+    })();
+    return true;
+  }
+
+  /* Switching this on or off changes what the content scripts do at page
+   * load, so the open tab has to start over for it to take effect. Done here
+   * rather than in the popup so it still happens if the popup is closed. */
+  if (msg.type === "cb:reloadYouTube") {
+    setTimeout(async () => {
+      try {
+        const tabs = await chrome.tabs.query({ url: ["*://*.youtube.com/*"] });
+        for (const t of tabs) chrome.tabs.reload(t.id);
+      } catch (e) {
+        /* nothing to reload */
+      }
+    }, 3000);
+    respond({ ok: true });
+    return true;
   }
 
   if (msg.type === "cb:checkFilters") {
