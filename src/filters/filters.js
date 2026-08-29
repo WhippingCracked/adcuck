@@ -223,26 +223,11 @@ var CB_FILTERS = {
    * advertising - intros, outros and filler are the creator's own video and
    * skipping them by default would surprise people. Feed-updatable, so the
    * list can change without a store release. */
-  sponsors: {
-    minVotes: 0,
-    /* Everything SponsorBlock can label, with what to call it and whether it
-     * is on to begin with. Only actual advertising defaults to on - intros,
-     * outros and tangents are the creator's own video, and skipping those
-     * uninvited would surprise people.
-     *
-     * The highlight is last and deliberately apart: it is not something to
-     * skip, it is the moment everyone scrubs forward to. */
-    available: [
-      { id: "sponsor", label: "Sponsors", on: true },
-      { id: "selfpromo", label: "Self-promotion", on: true },
-      { id: "interaction", label: "Subscribe reminders", on: true },
-      { id: "intro", label: "Intros", on: false },
-      { id: "outro", label: "Outros and endcards", on: false },
-      { id: "filler", label: "Tangents and filler", on: false },
-      { id: "music_offtopic", label: "Non-music sections", on: false },
-      { id: "preview", label: "Recaps and previews", on: false }
-    ]
-  },
+  /* SponsorBlock's categories and defaults are NOT here. They live in
+   * src/filters/sponsors.js, which the feed builder does not read and the
+   * update client cannot write, so pushing a new filter list can never change
+   * what somebody's player skips. test/sponsors.mjs enforces that. */
+
 
   /* Player state and controls used by the watchdog. */
   player: {

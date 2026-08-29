@@ -275,9 +275,11 @@
   }
 
   /* ---------- what to skip ---------- */
+  /* From sponsors.js, not filters.js - see the note at the top of that file.
+   * These are only the starting values; once a choice is stored it wins. */
   function categoryList() {
-    var f = globalThis.CB_FILTERS;
-    return (f && f.sponsors && f.sponsors.available) || [];
+    var s = globalThis.CB_SPONSORS;
+    return (s && s.available) || [];
   }
 
   function categories() {

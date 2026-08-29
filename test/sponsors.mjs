@@ -6,6 +6,9 @@
  * including the one that matters most, that the video id never leaves.
  */
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   sponsorSegments, hashPrefix, buildUrl, buildQuery, normalise,
   DEFAULT_CATEGORIES, HIGHLIGHT, clearCache
@@ -138,6 +141,98 @@ check(
 
 const q = buildQuery({ categories: { sponsor: true }, highlight: false });
 check("Without the highlight, poi is never requested", !q.actions.includes("poi"), q.actions.join(","));
+
+/* ------------------------------------------------------------------ *
+ * Skip settings are not filters, and a filter push must never touch them
+ *
+ * The category defaults used to sit inside filters.js - the file that gets
+ * committed and pushed to everyone every time a new ad is blocked. It was
+ * never actually carried in the feed, but the arrangement was one careless
+ * edit away from a filter update quietly changing what people's players skip.
+ * These checks keep the two apart for good.
+ * ------------------------------------------------------------------ */
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const evalGlobal = (file, name) =>
+  new Function(
+    "var globalThis = {};" + fs.readFileSync(path.join(ROOT, file), "utf8") + `\nreturn ${name};`
+  )();
+
+const FILTERS = evalGlobal("src/filters/filters.js", "CB_FILTERS");
+const SPONSORS = evalGlobal("src/filters/sponsors.js", "CB_SPONSORS");
+
+check("Skip settings are not in the filter list", FILTERS.sponsors === undefined);
+check("They live in their own file", Array.isArray(SPONSORS.available));
+
+/* The popup draws SPONSORS.available; the background asks with
+ * DEFAULT_CATEGORIES before the popup has ever been opened. Two lists, one
+ * truth - so if they disagree, a fresh install skips something different from
+ * what its own settings screen claims. */
+const fromFile = Object.fromEntries(SPONSORS.available.map((c) => [c.id, c.on]));
+check(
+  "The popup's defaults and the background's are the same list",
+  JSON.stringify(fromFile) === JSON.stringify(DEFAULT_CATEGORIES),
+  JSON.stringify(fromFile)
+);
+check(
+  "Only advertising is on to begin with",
+  SPONSORS.available.filter((c) => c.on).map((c) => c.id).join(",") ===
+    "sponsor,selfpromo,interaction"
+);
+check(
+  "Every category has something to call it",
+  SPONSORS.available.every((c) => c.id && c.label && typeof c.on === "boolean")
+);
+
+/* The one that actually matters: nothing about skipping may appear anywhere
+ * in what gets published, whatever shape a future feed takes. */
+const feedDir = path.join(ROOT, "feed/v1");
+const feedFiles = fs.existsSync(feedDir)
+  ? fs.readdirSync(feedDir).filter((f) => f.endsWith(".json"))
+  : [];
+check("The built feed is there to inspect", feedFiles.length > 0, `${feedFiles.length} files`);
+
+/* Look at the feed as data, not as text. Searching the raw JSON for the word
+ * "preview" matches
+ * ".ytp-ad-player-overlay-layout__skip-or-preview-container", a perfectly
+ * ordinary ad selector - and a test that cries wolf gets switched off, which
+ * is worse than not having it. So: whole values only, and setting names only
+ * where they appear as keys. */
+const CATEGORY_IDS = new Set(SPONSORS.available.map((c) => c.id).concat([HIGHLIGHT]));
+const SETTING_KEYS = new Set([
+  "sponsors", "sponsorCategories", "sponsorBlock", "sponsorHighlight",
+  "categories", "available", "minVotes"
+]);
+
+const leaked = [];
+function scan(node, where) {
+  if (typeof node === "string") {
+    if (CATEGORY_IDS.has(node)) leaked.push(`${where} = "${node}"`);
+    return;
+  }
+  if (Array.isArray(node)) return node.forEach((v, i) => scan(v, `${where}[${i}]`));
+  if (node && typeof node === "object") {
+    for (const [k, v] of Object.entries(node)) {
+      if (SETTING_KEYS.has(k)) leaked.push(`${where}.${k}`);
+      scan(v, `${where}.${k}`);
+    }
+  }
+}
+for (const f of feedFiles) {
+  scan(JSON.parse(fs.readFileSync(path.join(feedDir, f), "utf8")), f.split(".")[0]);
+}
+check(
+  "No skip setting appears anywhere in the published feed",
+  leaked.length === 0,
+  leaked.length ? "LEAKED: " + leaked.join(", ") : "clean"
+);
+
+/* And the update client must not be able to write them even if one did. */
+const bridge = fs.readFileSync(path.join(ROOT, "src/content/bridge.js"), "utf8");
+const applied = bridge.slice(bridge.indexOf("function publishFilters"));
+check(
+  "Applying a downloaded list touches no sponsor setting",
+  !/sponsor/i.test(applied.slice(0, applied.indexOf("\n  }")))
+);
 
 const failed = results.filter((r) => !r).length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);

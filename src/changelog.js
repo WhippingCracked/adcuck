@@ -14,6 +14,13 @@
  */
 var CHANGELOG = [
   {
+    version: "1.9.1",
+    date: "29 Aug 2026",
+    changes: [
+      "Skip settings are never changed by filter updates."
+    ]
+  },
+  {
     version: "1.9.0",
     date: "29 Aug 2026",
     changes: [
