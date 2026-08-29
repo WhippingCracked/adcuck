@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Runs before the stylesheet so the popup never paints the wrong theme.
+     chrome.storage is async; localStorage on the extension origin is not. -->
+<script src="theme.js"></script>
+<link rel="stylesheet" href="popup.css">
+<title>AdCuck</title>
+</head>
+<body>
+
+<header class="ph">
+  <svg class="glyph" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M12 2.5 4.5 5.6v6.1c0 4.6 3.1 8.4 7.5 9.8 4.4-1.4 7.5-5.2 7.5-9.8V5.6L12 2.5Z"
+          stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+    <path class="tick" d="M9 12.2l2.1 2.1L15.2 10"
+          stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path class="bars" d="M9.5 9.5v5M14.5 9.5v5"
+          stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  </svg>
+  <b>AdCuck</b>
+  <button id="theme" type="button" class="themebtn" title="Switch theme">AUTO</button>
+</header>
+
+<div id="main">
+
+<section class="card">
+  <div class="st">
+    <b id="status">Blocking</b>
+    <small id="statusSub">Active on youtube.com</small>
+  </div>
+  <button id="master" type="button" class="sw" role="switch" aria-checked="true"
+          aria-label="Toggle ad blocking">
+    <span class="knob"></span>
+  </button>
+</section>
+
+<section class="stats">
+  <div class="stat"><b id="sessionCount">0</b><small>This session</small></div>
+  <div class="stat"><b id="totalCount">0</b><small>All time</small></div>
+</section>
+
+<div class="row">
+  <span class="dot" id="dot"></span>
+  <span class="meta" id="filterMeta">filters &middot; bundled</span>
+  <button id="checkNow" type="button" class="linkbtn">Check now</button>
+</div>
+
+<div class="row" id="startRow" hidden>
+  <span class="dot" id="startDot"></span>
+  <span class="meta" id="startMeta"></span>
+</div>
+
+<div class="row" id="channelRow" hidden>
+  <button id="allowChannel" type="button" class="sw sw--mini" role="switch"
+          aria-checked="false" aria-label="Allow ads on this channel">
+    <span class="knob"></span>
+  </button>
+  <em id="channelLabel">Allow ads on this channel</em>
+</div>
+
+<section id="diagRow" hidden>
+  <div class="row">
+    <button id="tglNet" type="button" class="sw sw--mini" role="switch"
+            aria-checked="true" aria-label="Block ad requests">
+      <span class="knob"></span>
+    </button>
+    <em>Block ad requests</em>
+  </div>
+  <div class="row">
+    <button id="tglVideo" type="button" class="sw sw--mini" role="switch"
+            aria-checked="true" aria-label="Strip ads from the video">
+      <span class="knob"></span>
+    </button>
+    <em>Strip ads from the video</em>
+  </div>
+  <div class="row">
+    <button id="tglClamp" type="button" class="sw sw--mini" role="switch"
+            aria-checked="true" aria-label="Skip YouTube's start delay">
+      <span class="knob"></span>
+    </button>
+    <em>Skip YouTube's start delay</em>
+  </div>
+  <div class="row">
+    <button id="tglAdFree" type="button" class="sw sw--mini" role="switch"
+            aria-checked="true" aria-label="Ask for videos without ads">
+      <span class="knob"></span>
+    </button>
+    <em>Ask for videos without ads</em>
+  </div>
+  <div class="row" id="traceRow" hidden>
+    <span class="meta" id="traceMeta"></span>
+  </div>
+</section>
+
+</div><!-- /#main -->
+
+<section class="log" id="log" hidden>
+  <div class="logbar">
+    <button id="logBack" class="backbtn" type="button" aria-label="Back">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M10 3.5 5.5 8l4.5 4.5" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <b>What's new</b>
+  </div>
+  <div id="logBody"></div>
+</section>
+
+<p class="live" id="live" role="status" aria-live="polite"></p>
+
+<footer class="pf">
+  <span>Made by <b>Archie</b></span>
+  <span class="pfend">
+    <button id="whatsNew" class="newbtn" type="button">
+      <span class="newdot" id="newDot" hidden></span>What's new
+    </button>
+    <span id="verText">v1.7.0</span>
+  </span>
+</footer>
+
+<script src="../changelog.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
