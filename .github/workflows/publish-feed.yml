@@ -1,0 +1,78 @@
+## Publishes the filter feed to GitHub Pages.
+##
+## The extension reads <pages-url>/v1/manifest.json every six hours, so
+## anything merged here reaches users without a store release. Set the same
+## URL as `feedUrl` in the extension (or edit DEFAULT_FEED in
+## src/background/updater.js) once Pages is enabled on this repo.
+
+name: Publish filter feed
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/filters/filters.js"
+      - "rules/network.json"
+      - "tools/build-feed.mjs"
+      - ".github/workflows/publish-feed.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build the feed
+        run: node tools/build-feed.mjs
+
+      # A broken feed is worse than a stale one: it would be fetched by every
+      # install. Check it parses and carries what it should before publishing.
+      - name: Verify the feed
+        run: |
+          node -e '
+            const fs = require("fs");
+            const dir = "feed/v1";
+            const m = JSON.parse(fs.readFileSync(dir + "/manifest.json", "utf8"));
+            if (!m.listVersion) throw new Error("no listVersion");
+            if (!Array.isArray(m.files) || !m.files.length) throw new Error("no files");
+            const crypto = require("crypto");
+            for (const f of m.files) {
+              const body = fs.readFileSync(dir + "/" + f.url, "utf8");
+              const got = crypto.createHash("sha256").update(body, "utf8").digest("hex");
+              if (got !== f.sha256) throw new Error("hash mismatch: " + f.name);
+              JSON.parse(body);
+            }
+            const cosmetic = JSON.parse(
+              fs.readFileSync(dir + "/" + m.files.find(f => f.name === "cosmetic").url, "utf8")
+            );
+            if (!cosmetic.hide.length) throw new Error("empty hide list");
+            console.log("feed " + m.listVersion + " ok, " + m.files.length + " files");
+          '
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: feed
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
