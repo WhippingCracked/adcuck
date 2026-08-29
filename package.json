@@ -9,6 +9,7 @@
     "bench": "node test/bench.mjs",
     "feed": "node tools/build-feed.mjs",
     "discover": "node tools/discover.mjs",
+    "add": "node tools/add-filters.mjs",
     "icons": "python3 tools/make-icons.py",
     "setup": "npm install && npx playwright install chromium"
   },

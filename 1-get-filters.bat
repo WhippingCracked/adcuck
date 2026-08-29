@@ -3,8 +3,10 @@ REM ===========================================================
 REM  AdCuck - STEP 1: find new ads to block
 REM
 REM  Opens YouTube in a browser, watches what comes through,
-REM  and writes a list of ad-looking things you are NOT
-REM  blocking yet.
+REM  and finds ad-looking things you are NOT blocking yet.
+REM
+REM  Then it asks you about each one and adds the ones you
+REM  say yes to. You never have to edit a file by hand.
 REM
 REM  Just double-click this file.
 REM ===========================================================
@@ -62,25 +64,31 @@ if errorlevel 1 (
 
 echo.
 echo  ============================================
+echo   Now pick which ones to block
+echo  ============================================
+echo.
+echo  It will show you one at a time and ask yes or no.
+echo.
+echo  Some of them will be normal videos that just have
+echo  "ad" somewhere in the name. Say no if you are not
+echo  sure - you can always run this again later.
+echo.
+
+call node tools/add-filters.mjs
+if errorlevel 1 (
+  echo.
+  echo  [X] Nothing was added. The message above says why.
+  echo.
+  pause
+  exit /b 1
+)
+
+echo  ============================================
 echo   Done
 echo  ============================================
 echo.
-echo  The list is in:  feed\discovered.json
+echo  Anything you said yes to is now in your filter list.
 echo.
-echo  IMPORTANT: do not paste all of it in. Some entries
-echo  will be normal videos that just have "ad" somewhere
-echo  in the name. Blocking those would hide real videos.
-echo.
-echo  Pick the ones you are sure about, add them to the
-echo  hide list in:  src\filters\filters.js
-echo.
-echo  Then run  2-check.bat
-echo.
-
-if exist "feed\discovered.json" (
-  choice /c YN /n /m "  Open the list now? [Y/N] "
-  if not errorlevel 2 start "" notepad "feed\discovered.json"
-)
-
+echo  Next: run  2-check.bat
 echo.
 pause
