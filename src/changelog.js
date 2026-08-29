@@ -14,6 +14,14 @@
  */
 var CHANGELOG = [
   {
+    version: "1.9.0",
+    date: "29 Aug 2026",
+    changes: [
+      "Choose which kinds of sponsor bits get skipped.",
+      "Can jump straight to the best bit of a video."
+    ]
+  },
+  {
     version: "1.8.0",
     date: "29 Aug 2026",
     changes: [

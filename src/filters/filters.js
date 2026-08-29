@@ -109,9 +109,24 @@ var CB_FILTERS = {
    * skipping them by default would surprise people. Feed-updatable, so the
    * list can change without a store release. */
   sponsors: {
-    categories: ["sponsor", "selfpromo", "interaction"],
-    actionTypes: ["skip"],
-    minVotes: 0
+    minVotes: 0,
+    /* Everything SponsorBlock can label, with what to call it and whether it
+     * is on to begin with. Only actual advertising defaults to on - intros,
+     * outros and tangents are the creator's own video, and skipping those
+     * uninvited would surprise people.
+     *
+     * The highlight is last and deliberately apart: it is not something to
+     * skip, it is the moment everyone scrubs forward to. */
+    available: [
+      { id: "sponsor", label: "Sponsors", on: true },
+      { id: "selfpromo", label: "Self-promotion", on: true },
+      { id: "interaction", label: "Subscribe reminders", on: true },
+      { id: "intro", label: "Intros", on: false },
+      { id: "outro", label: "Outros and endcards", on: false },
+      { id: "filler", label: "Tangents and filler", on: false },
+      { id: "music_offtopic", label: "Non-music sections", on: false },
+      { id: "preview", label: "Recaps and previews", on: false }
+    ]
   },
 
   /* Player state and controls used by the watchdog. */

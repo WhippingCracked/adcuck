@@ -28,7 +28,9 @@
     clamp: true,
     videoAds: true,
     adFree: true,
-    sponsorBlock: false
+    sponsorBlock: false,
+    sponsorCategories: null,
+    sponsorHighlight: false
   };
   var root = document.documentElement;
   var channel = { id: "", name: "" };
@@ -88,7 +90,10 @@
 
     document.dispatchEvent(
       new CustomEvent("__cb_sponsors", {
-        detail: { enabled: next === "on" && state.sponsorBlock === true }
+        detail: {
+          enabled: next === "on" && state.sponsorBlock === true,
+          highlight: state.sponsorHighlight === true
+        }
       })
     );
     document.dispatchEvent(
@@ -106,7 +111,8 @@
     if (area !== "sync") return;
     if (!changes.enabled && !changes.allowlist && !changes.diagnostics &&
         !changes.clamp && !changes.videoAds && !changes.adFree &&
-        !changes.sponsorBlock) return;
+        !changes.sponsorBlock && !changes.sponsorCategories &&
+        !changes.sponsorHighlight) return;
     chrome.storage.sync.get(DEFAULTS, function (state) {
       if (chrome.runtime.lastError) return;
       apply(state);

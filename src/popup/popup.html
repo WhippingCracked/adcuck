@@ -53,6 +53,7 @@
     <span class="knob"></span>
   </button>
   <em>Skip sponsor bits in videos</em>
+  <button id="sponsorOpts" type="button" class="linkbtn" hidden>Settings</button>
 </div>
 
 <!-- Attribution is a condition of the SponsorBlock licence (CC BY-NC-SA),
@@ -117,6 +118,24 @@
 
 </div><!-- /#main -->
 
+<section id="sponsorView" hidden>
+  <div class="logbar">
+    <button id="sponsorBack" class="backbtn" type="button" aria-label="Back">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M10 3.5 5.5 8l4.5 4.5" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <b>What to skip</b>
+  </div>
+  <div id="sponsorList"></div>
+  <div class="row">
+    <span class="meta">segment data by
+      <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a>
+    </span>
+  </div>
+</section>
+
 <section class="log" id="log" hidden>
   <div class="logbar">
     <button id="logBack" class="backbtn" type="button" aria-label="Back">
@@ -138,10 +157,11 @@
     <button id="whatsNew" class="newbtn" type="button">
       <span class="newdot" id="newDot" hidden></span>What's new
     </button>
-    <span id="verText">v1.8.0</span>
+    <span id="verText">v1.9.0</span>
   </span>
 </footer>
 
+<script src="../filters/filters.js"></script>
 <script src="../changelog.js"></script>
 <script src="popup.js"></script>
 </body>

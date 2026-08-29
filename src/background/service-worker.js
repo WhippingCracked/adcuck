@@ -6,7 +6,7 @@
  */
 
 import { checkForUpdates, scheduleUpdates, onAlarm } from "./updater.js";
-import { sponsorSegments, DEFAULT_CFG } from "./sponsors.js";
+import { sponsorSegments, DEFAULT_CATEGORIES } from "./sponsors.js";
 
 const RULESET = "youtube-ads";
 const DEFAULTS = {
@@ -17,6 +17,8 @@ const DEFAULTS = {
   feedUrl: "",
   clamp: true,
   sponsorBlock: false,
+  sponsorCategories: DEFAULT_CATEGORIES,
+  sponsorHighlight: false,
   netRules: true,
   videoAds: true,
   adFree: true
@@ -137,14 +139,24 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
   if (msg.type === "cb:segments") {
     (async () => {
       try {
-        const { sponsorBlock } = await chrome.storage.sync.get({ sponsorBlock: false });
-        if (!sponsorBlock) return respond({ segments: [] });
-        const { filters } = await chrome.storage.local.get({ filters: null });
-        const cfg =
-          (filters && filters.cosmetic && filters.cosmetic.sponsors) || DEFAULT_CFG;
-        respond({ segments: await sponsorSegments(String(msg.videoId || ""), cfg) });
+        const s = await chrome.storage.sync.get({
+          sponsorBlock: false,
+          sponsorCategories: DEFAULT_CATEGORIES,
+          sponsorHighlight: false
+        });
+        if (!s.sponsorBlock) return respond({ segments: [], highlight: null });
+        const cfg = {
+          categories: s.sponsorCategories,
+          highlight: s.sponsorHighlight,
+          minVotes: 0
+        };
+        respond(await sponsorSegments(String(msg.videoId || ""), cfg));
       } catch (e) {
-        respond({ segments: [], error: String(e && e.message ? e.message : e) });
+        respond({
+          segments: [],
+          highlight: null,
+          error: String(e && e.message ? e.message : e)
+        });
       }
     })();
     return true;

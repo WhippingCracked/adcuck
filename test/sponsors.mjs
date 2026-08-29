@@ -7,7 +7,8 @@
  */
 import crypto from "node:crypto";
 import {
-  sponsorSegments, hashPrefix, buildUrl, normalise, DEFAULT_CFG, clearCache
+  sponsorSegments, hashPrefix, buildUrl, buildQuery, normalise,
+  DEFAULT_CATEGORIES, HIGHLIGHT, clearCache
 } from "../src/background/sponsors.js";
 
 const results = [];
@@ -24,12 +25,17 @@ const REPLY = [
       { UUID: "c", segment: [50, 60], category: "music_offtopic", votes: 9, actionType: "skip" },
       { UUID: "d", segment: [70, 80], category: "sponsor", votes: 1, actionType: "mute" },
       { UUID: "e", segment: [90, 90], category: "sponsor", votes: 1, actionType: "skip" },
-      { UUID: "f", segment: ["x", 5], category: "sponsor", actionType: "skip" }
+      { UUID: "f", segment: ["x", 5], category: "sponsor", actionType: "skip" },
+      /* A highlight: a single moment, zero length, its own action type. */
+      { UUID: "h", segment: [126, 126], category: "poi_highlight", votes: 4, actionType: "poi" },
+      { UUID: "h2", segment: [300, 300], category: "poi_highlight", votes: 1, actionType: "poi" }
   ]},
   { videoID: "otherVideo", segments: [
       { UUID: "z", segment: [0, 999], category: "sponsor", votes: 9, actionType: "skip" }
   ]}
 ];
+
+const CFG = { categories: DEFAULT_CATEGORIES, highlight: false, minVotes: 0 };
 
 let asked = [];
 const fakeFetch = async (url) => {
@@ -45,7 +51,7 @@ check("...and only four characters of it", prefix.length === 4, prefix);
 
 clearCache();
 asked = [];
-const segs = await sponsorSegments(VIDEO, DEFAULT_CFG, fakeFetch);
+const { segments: segs } = await sponsorSegments(VIDEO, CFG, fakeFetch);
 check("The video id never appears in the request", !asked[0].includes(VIDEO), asked[0]);
 check("Only the hash prefix identifies it", new URL(asked[0]).pathname.endsWith("/" + expected));
 
@@ -61,23 +67,77 @@ check("Another video in the same bucket is ignored", !segs.some((s) => s.end ===
 
 /* --- caching: one bucket, one request --------------------------------- */
 asked = [];
-await sponsorSegments(VIDEO, DEFAULT_CFG, fakeFetch);
+await sponsorSegments(VIDEO, CFG, fakeFetch);
 check("A repeat lookup does not hit the network again", asked.length === 0, `${asked.length} requests`);
 
 /* --- the ordinary failures -------------------------------------------- */
 clearCache();
-const empty = await sponsorSegments("noSegmentsHere", DEFAULT_CFG, async () => ({ ok: false, status: 404 }));
-check("A bucket nobody has submitted to is not an error", Array.isArray(empty) && empty.length === 0);
+const empty = await sponsorSegments("noSegmentsHere", CFG, async () => ({ ok: false, status: 404 }));
+check("A bucket nobody has submitted to is not an error", empty.segments.length === 0 && empty.highlight === null);
 
 clearCache();
 let threw = false;
 try {
-  await sponsorSegments(VIDEO, DEFAULT_CFG, async () => ({ ok: false, status: 500 }));
+  await sponsorSegments(VIDEO, CFG, async () => ({ ok: false, status: 500 }));
 } catch (e) { threw = true; }
 check("A server error is reported, not silently swallowed", threw);
 
-check("Nothing is requested without a video id", (await sponsorSegments("", DEFAULT_CFG, fakeFetch)).length === 0);
-check("Junk in place of a reply yields nothing", normalise("not an array", VIDEO, DEFAULT_CFG).length === 0);
+check("Nothing is requested without a video id", (await sponsorSegments("", CFG, fakeFetch)).segments.length === 0);
+check("Junk in place of a reply yields nothing", normalise("not an array", VIDEO, CFG).segments.length === 0);
+
+/* --- chosen categories ------------------------------------------------ */
+clearCache();
+const onlySponsor = await sponsorSegments(
+  VIDEO,
+  { categories: { sponsor: true, selfpromo: false, interaction: false }, minVotes: 0 },
+  fakeFetch
+);
+check(
+  "Turning a category off leaves it in the video",
+  onlySponsor.segments.length === 1 && onlySponsor.segments[0].category === "sponsor",
+  JSON.stringify(onlySponsor.segments.map((s) => s.category))
+);
+
+clearCache();
+const withIntro = await sponsorSegments(
+  VIDEO,
+  { categories: { sponsor: true, music_offtopic: true }, minVotes: 0 },
+  fakeFetch
+);
+check(
+  "Turning one on starts skipping it",
+  withIntro.segments.some((s) => s.category === "music_offtopic")
+);
+
+/* The reply depends on what was asked for, so a changed setting must not be
+ * served the previous answer. */
+asked = [];
+await sponsorSegments(VIDEO, { categories: { sponsor: true }, minVotes: 0 }, fakeFetch);
+check("A different set of categories is looked up afresh", asked.length === 1, `${asked.length} requests`);
+
+/* --- the highlight ---------------------------------------------------- */
+clearCache();
+const noHl = await sponsorSegments(VIDEO, CFG, fakeFetch);
+check("No highlight comes back unless asked for", noHl.highlight === null);
+
+clearCache();
+asked = [];
+const withHl = await sponsorSegments(
+  VIDEO,
+  { categories: DEFAULT_CATEGORIES, highlight: true, minVotes: 0 },
+  fakeFetch
+);
+check("The highlight is a single moment, not a range", withHl.highlight === 126, String(withHl.highlight));
+check("...the earliest one, if a video has several", withHl.highlight === 126);
+check("...and it is asked for by name", decodeURIComponent(asked[0]).includes(HIGHLIGHT), asked[0]);
+check("...using its own action type", decodeURIComponent(asked[0]).includes("poi"), asked[0]);
+check(
+  "A zero-length highlight is not mistaken for something to skip",
+  !withHl.segments.some((s) => s.category === HIGHLIGHT)
+);
+
+const q = buildQuery({ categories: { sponsor: true }, highlight: false });
+check("Without the highlight, poi is never requested", !q.actions.includes("poi"), q.actions.join(","));
 
 const failed = results.filter((r) => !r).length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);

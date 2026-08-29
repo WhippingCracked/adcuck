@@ -54,12 +54,18 @@
 
 * { box-sizing: border-box; }
 
+html { overflow-x: hidden; }
+
 /* Author styles beat the UA sheet, so .row{display:flex} would otherwise
    defeat the hidden attribute. Keep this above every display rule. */
 [hidden] { display: none !important; }
 
 body {
+  /* 320 is the target, but a vertical scrollbar steals ~15px of it. Without
+     max-width the layout then overflows sideways, and a popup cannot be
+     widened by the user - whatever is past the edge is simply unreachable. */
   width: 320px;
+  max-width: 100%;
   margin: 0;
   background: var(--bg);
   color: var(--ink);

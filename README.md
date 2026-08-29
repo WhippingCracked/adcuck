@@ -92,7 +92,7 @@ Loads the unpacked extension into Chromium and serves a synthetic YouTube page
 at the real origin (so the content scripts actually match), then asserts each
 layer's behaviour: ads stripped, real content untouched, the pause toggle
 genuinely stopping every layer, the channel allowlist honoured, both popup
-themes painting, and no uncaught errors. 111 checks, plus 17 in
+themes painting, and no uncaught errors. 122 checks, plus 27 in
 `test/sponsors.mjs`. Screenshots of the popup
 land in `test/screenshots/`.
 
@@ -150,10 +150,19 @@ cannot tell which one is playing; the right one is picked out locally. There
 are unit tests asserting the id never appears in the request URL, because that
 is the one property worth proving rather than assuming.
 
-Only categories that are genuinely advertising are skipped — `sponsor`,
-`selfpromo`, `interaction`. Intros, outros and filler are the creator's own
-video, and skipping those by default would surprise people. The list lives in
-`filters.js`, so it ships through the update feed.
+Eight categories are offered, under **Settings** next to the switch. Only the
+three that are genuinely advertising start switched on — `sponsor`,
+`selfpromo`, `interaction`. Intros, outros, filler, recaps and non-music
+sections are the creator's own video, so they are there to be turned on rather
+than discovered already running. The list lives in `filters.js`, so it ships
+through the update feed.
+
+**The highlight** — the moment everyone scrubs forward to — is handled apart
+from all of them, because it is not a range to remove but a single point to
+travel to. It arrives as a zero-length segment with its own action type, which
+every one of the ordinary filters would throw away. Switched on, it puts a
+**Jump to the best bit** button on the player and waits: jumping someone past
+the start of a video they chose to open is not a decision to make for them.
 
 **Attribution is a licence condition, not a courtesy.** The database is
 CC BY-NC-SA 4.0, so the popup credits SponsorBlock whenever the feature is on,

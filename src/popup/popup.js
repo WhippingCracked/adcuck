@@ -40,6 +40,10 @@
     sponsorCredit: $("sponsorCredit"),
     reloadNote: $("reloadNote"),
     reloadMeta: $("reloadMeta"),
+    sponsorOpts: $("sponsorOpts"),
+    sponsorView: $("sponsorView"),
+    sponsorList: $("sponsorList"),
+    sponsorBack: $("sponsorBack"),
     live: $("live")
   };
 
@@ -54,7 +58,9 @@
     videoAds: true,
     clamp: true,
     adFree: true,
-    sponsorBlock: false
+    sponsorBlock: false,
+    sponsorCategories: null,
+    sponsorHighlight: false
   };
   var state = {
     enabled: true,
@@ -158,7 +164,9 @@
 
   els.logBack.addEventListener("click", closeLog);
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && !els.log.hidden) closeLog();
+    if (e.key !== "Escape") return;
+    if (!els.log.hidden) closeLog();
+    else if (!els.sponsorView.hidden) closeSponsorView();
   });
 
   els.whatsNew.addEventListener("click", function (e) {
@@ -261,7 +269,103 @@
     els.tglSponsor.setAttribute("aria-checked", state.sponsorBlock ? "true" : "false");
     /* The licence requires the credit while the data is in use. */
     els.sponsorCredit.hidden = !state.sponsorBlock;
+    /* Settings for something switched off would be a control that does
+     * nothing, so it only appears once there is something to configure. */
+    els.sponsorOpts.hidden = !state.sponsorBlock;
   }
+
+  /* ---------- what to skip ---------- */
+  function categoryList() {
+    var f = globalThis.CB_FILTERS;
+    return (f && f.sponsors && f.sponsors.available) || [];
+  }
+
+  function categories() {
+    if (state.sponsorCategories) return state.sponsorCategories;
+    var out = {};
+    categoryList().forEach(function (c) { out[c.id] = c.on; });
+    return out;
+  }
+
+  function categoryRow(id, labelText, checked, onFlip) {
+    var row = document.createElement("div");
+    row.className = "row";
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "sw sw--mini";
+    btn.setAttribute("role", "switch");
+    btn.setAttribute("aria-checked", checked ? "true" : "false");
+    btn.setAttribute("aria-label", labelText);
+    btn.dataset.cat = id;
+    var knob = document.createElement("span");
+    knob.className = "knob";
+    btn.appendChild(knob);
+
+    var label = document.createElement("em");
+    label.textContent = labelText;
+
+    btn.addEventListener("click", function () {
+      var now = btn.getAttribute("aria-checked") !== "true";
+      btn.setAttribute("aria-checked", now ? "true" : "false");
+      onFlip(now);
+    });
+
+    row.appendChild(btn);
+    row.appendChild(label);
+    return row;
+  }
+
+  function renderSponsorList() {
+    var cats = categories();
+    els.sponsorList.textContent = "";
+
+    categoryList().forEach(function (c) {
+      els.sponsorList.appendChild(
+        categoryRow(c.id, c.label, cats[c.id] === true, function (on) {
+          var next = {};
+          Object.keys(cats).forEach(function (k) { next[k] = cats[k]; });
+          next[c.id] = on;
+          state.sponsorCategories = next;
+          chrome.storage.sync.set({ sponsorCategories: next });
+          els.live.textContent = on ? c.label + " will be skipped" : c.label + " will play";
+        })
+      );
+    });
+
+    /* The highlight is not something to skip - it is the moment people scrub
+     * forward to - so it sits apart, and it only ever offers a button. */
+    var hr = categoryRow(
+      "highlight",
+      "Offer to jump to the best bit",
+      state.sponsorHighlight === true,
+      function (on) {
+        state.sponsorHighlight = on;
+        chrome.storage.sync.set({ sponsorHighlight: on });
+        els.live.textContent = on
+          ? "A jump button will appear on videos that have a highlight"
+          : "The jump button is off";
+      }
+    );
+    hr.style.borderTop = "1px solid var(--line)";
+    els.sponsorList.appendChild(hr);
+  }
+
+  function openSponsorView() {
+    renderSponsorList();
+    els.main.hidden = true;
+    els.sponsorView.hidden = false;
+    els.sponsorBack.focus();
+  }
+
+  function closeSponsorView() {
+    els.sponsorView.hidden = true;
+    els.main.hidden = false;
+    els.sponsorOpts.focus();
+  }
+
+  els.sponsorOpts.addEventListener("click", openSponsorView);
+  els.sponsorBack.addEventListener("click", closeSponsorView);
 
   /* Switching this changes what the content scripts do at page load, so the
    * open tab has to start again. Counting down out loud beats a page

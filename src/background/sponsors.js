@@ -19,13 +19,29 @@ export const SB_API = "https://sponsor.ajay.app/api/skipSegments/";
 const TTL = 30 * 60 * 1000;
 const MAX_CACHE = 50;
 
-const cache = new Map(); // hash prefix -> { at, videos }
+const cache = new Map(); // request signature -> { at, videos }
 
-export const DEFAULT_CFG = {
-  categories: ["sponsor", "selfpromo", "interaction"],
-  actionTypes: ["skip"],
-  minVotes: 0
+/* A highlight is not a segment to skip. It is a single moment - the bit
+ * everyone scrubs forward to - and it arrives as a zero-length segment with
+ * its own action type, so it has to travel a separate path through all of
+ * this or the ordinary filters throw it away. */
+export const HIGHLIGHT = "poi_highlight";
+
+export const DEFAULT_CATEGORIES = {
+  sponsor: true,
+  selfpromo: true,
+  interaction: true,
+  intro: false,
+  outro: false,
+  filler: false,
+  music_offtopic: false,
+  preview: false
 };
+
+export function selected(categories) {
+  const cats = categories || DEFAULT_CATEGORIES;
+  return Object.keys(cats).filter((k) => cats[k]);
+}
 
 /* The four characters that stand in for the video id. */
 export async function hashPrefix(videoId, chars = 4) {
@@ -37,12 +53,23 @@ export async function hashPrefix(videoId, chars = 4) {
     .slice(0, chars);
 }
 
+export function buildQuery(cfg) {
+  const cats = selected(cfg.categories);
+  const actions = ["skip"];
+  if (cfg.highlight) {
+    cats.push(HIGHLIGHT);
+    actions.push("poi");
+  }
+  return { cats, actions };
+}
+
 export function buildUrl(prefix, cfg) {
+  const { cats, actions } = buildQuery(cfg);
   return (
     SB_API +
     prefix +
-    "?categories=" + encodeURIComponent(JSON.stringify(cfg.categories)) +
-    "&actionTypes=" + encodeURIComponent(JSON.stringify(cfg.actionTypes))
+    "?categories=" + encodeURIComponent(JSON.stringify(cats)) +
+    "&actionTypes=" + encodeURIComponent(JSON.stringify(actions))
   );
 }
 
@@ -50,35 +77,55 @@ export function buildUrl(prefix, cfg) {
  * network, and a malformed segment must be dropped rather than handed to a
  * function that will seek the player somewhere absurd. */
 export function normalise(videos, videoId, cfg) {
-  if (!Array.isArray(videos)) return [];
-  const entry = videos.find((v) => v && v.videoID === videoId);
-  if (!entry || !Array.isArray(entry.segments)) return [];
+  const out = { segments: [], highlight: null };
+  if (!Array.isArray(videos)) return out;
 
-  return entry.segments
-    .filter((s) => {
-      if (!s || !Array.isArray(s.segment) || s.segment.length !== 2) return false;
-      const [start, end] = s.segment;
-      if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
-      if (start < 0 || end <= start) return false;
-      if (!cfg.categories.includes(s.category)) return false;
-      if (s.actionType && !cfg.actionTypes.includes(s.actionType)) return false;
-      if (typeof s.votes === "number" && s.votes < cfg.minVotes) return false;
-      return true;
-    })
-    .map((s) => ({
+  const entry = videos.find((v) => v && v.videoID === videoId);
+  if (!entry || !Array.isArray(entry.segments)) return out;
+
+  const wanted = selected(cfg.categories);
+
+  for (const s of entry.segments) {
+    if (!s || !Array.isArray(s.segment) || s.segment.length !== 2) continue;
+    const [start, end] = s.segment;
+    if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+    if (start < 0) continue;
+
+    if (s.category === HIGHLIGHT) {
+      /* One highlight per video, and only if asked for. Zero length is
+       * correct here - it is a point, not a range. */
+      if (!cfg.highlight) continue;
+      if (out.highlight === null || start < out.highlight) out.highlight = start;
+      continue;
+    }
+
+    if (end <= start) continue;
+    if (!wanted.includes(s.category)) continue;
+    if (s.actionType && s.actionType !== "skip") continue;
+    if (typeof s.votes === "number" && s.votes < (cfg.minVotes || 0)) continue;
+
+    out.segments.push({
       uuid: String(s.UUID || s.segment.join("-")),
-      start: s.segment[0],
-      end: s.segment[1],
+      start,
+      end,
       category: s.category
-    }))
-    .sort((a, b) => a.start - b.start);
+    });
+  }
+
+  out.segments.sort((a, b) => a.start - b.start);
+  return out;
 }
 
-export async function sponsorSegments(videoId, cfg = DEFAULT_CFG, fetchImpl = fetch) {
-  if (!videoId) return [];
-  const prefix = await hashPrefix(videoId);
+export async function sponsorSegments(videoId, cfg = {}, fetchImpl = fetch) {
+  if (!videoId) return { segments: [], highlight: null };
 
-  let hit = cache.get(prefix);
+  const prefix = await hashPrefix(videoId);
+  const { cats, actions } = buildQuery(cfg);
+  /* The reply depends on what was asked for, so the cache key has to as well -
+   * otherwise turning a category on would keep serving the old answer. */
+  const key = prefix + "|" + cats.sort().join(",") + "|" + actions.join(",");
+
+  let hit = cache.get(key);
   if (!hit || Date.now() - hit.at > TTL) {
     const res = await fetchImpl(buildUrl(prefix, cfg), { credentials: "omit" });
     /* 404 means nobody has submitted anything in this bucket yet. Ordinary. */
@@ -89,7 +136,7 @@ export async function sponsorSegments(videoId, cfg = DEFAULT_CFG, fetchImpl = fe
     } else {
       throw new Error("HTTP " + res.status);
     }
-    cache.set(prefix, hit);
+    cache.set(key, hit);
     if (cache.size > MAX_CACHE) cache.delete(cache.keys().next().value);
   }
 

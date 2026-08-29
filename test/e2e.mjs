@@ -784,7 +784,94 @@ if (extId) {
   check("...and warns before refreshing", afterToggle.noteShown && /refresh/i.test(afterToggle.note), afterToggle.note);
   check("...counting down rather than jumping", /\d/.test(afterToggle.note), afterToggle.note);
 
-  await popup.evaluate(() => chrome.storage.sync.set({ sponsorBlock: false }));
+  /* --- the settings sub-view ---------------------------------------- */
+  const optsBtn = await popup.evaluate(() => ({
+    shown: !document.getElementById("sponsorOpts").hidden
+  }));
+  check("Settings appear once sponsor skipping is on", optsBtn.shown === true);
+
+  await popup.click("#sponsorOpts");
+  await popup.waitForTimeout(250);
+  const opts = await popup.evaluate(() => {
+    const rows = [...document.querySelectorAll("#sponsorList .row")];
+    const byLabel = (t) =>
+      rows.find((r) => r.querySelector("em")?.textContent === t);
+    return {
+      viewShown: !document.getElementById("sponsorView").hidden,
+      mainHidden: document.getElementById("main").hidden,
+      count: rows.length,
+      labels: rows.map((r) => r.querySelector("em")?.textContent),
+      sponsorOn: byLabel("Sponsors")?.querySelector("button")?.getAttribute("aria-checked"),
+      introOn: byLabel("Intros")?.querySelector("button")?.getAttribute("aria-checked"),
+      highlightOn: byLabel("Offer to jump to the best bit")
+        ?.querySelector("button")
+        ?.getAttribute("aria-checked"),
+      credits: /SponsorBlock/.test(document.getElementById("sponsorView").textContent)
+    };
+  });
+  check("The settings view opens over the main one", opts.viewShown && opts.mainHidden);
+  check("Every category is listed, plus the highlight", opts.count === 9, `${opts.count} rows`);
+  check("Advertising categories start on", opts.sponsorOn === "true");
+  check("The creator's own video does not", opts.introOn === "false", `intros=${opts.introOn}`);
+  check("The highlight is offered, not assumed", opts.highlightOn === "false");
+  check("The credit follows into the settings view", opts.credits === true);
+
+  /* Flipping one must actually be saved, not just redrawn. */
+  const saved = await popup.evaluate(async () => {
+    const row = [...document.querySelectorAll("#sponsorList .row")].find(
+      (r) => r.querySelector("em")?.textContent === "Intros"
+    );
+    row.querySelector("button").click();
+    await new Promise((r) => setTimeout(r, 300));
+    const s = await chrome.storage.sync.get({ sponsorCategories: null });
+    return s.sponsorCategories;
+  });
+  check("Turning a category on is remembered", saved && saved.intro === true, JSON.stringify(saved));
+  check("...without disturbing the others", saved && saved.sponsor === true);
+
+  const hlSaved = await popup.evaluate(async () => {
+    const row = [...document.querySelectorAll("#sponsorList .row")].find(
+      (r) => r.querySelector("em")?.textContent === "Offer to jump to the best bit"
+    );
+    row.querySelector("button").click();
+    await new Promise((r) => setTimeout(r, 300));
+    return (await chrome.storage.sync.get({ sponsorHighlight: null })).sponsorHighlight;
+  });
+  check("The highlight setting is remembered too", hlSaved === true, String(hlSaved));
+
+  /* A popup must never scroll sideways - it cannot be widened by the user,
+   * so anything overflowing is simply unreachable. */
+  const overflow = await popup.evaluate(() => ({
+    scrollW: document.documentElement.scrollWidth,
+    clientW: document.documentElement.clientWidth,
+    bodyW: document.body.getBoundingClientRect().width
+  }));
+  check(
+    "The settings view does not overflow sideways",
+    overflow.scrollW <= overflow.clientW,
+    `${overflow.scrollW} vs ${overflow.clientW}`
+  );
+
+  await popup.setViewportSize({ width: 340, height: 620 });
+  await popup.waitForTimeout(150);
+  await popup.screenshot({ path: path.join(shots, "popup-sponsor-settings.png") });
+  await popup.setViewportSize({ width: 320, height: 340 });
+
+  await popup.click("#sponsorBack");
+  await popup.waitForTimeout(200);
+  const backOk = await popup.evaluate(() => ({
+    view: document.getElementById("sponsorView").hidden,
+    main: !document.getElementById("main").hidden
+  }));
+  check("Back leaves the settings view", backOk.view && backOk.main);
+
+  await popup.evaluate(() =>
+    chrome.storage.sync.set({
+      sponsorBlock: false,
+      sponsorHighlight: false,
+      sponsorCategories: null
+    })
+  );
 
   /* --- filter status row -------------------------------------------- */
   const filterRow = await popup.evaluate(() => ({
