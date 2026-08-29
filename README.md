@@ -54,6 +54,7 @@ If you would rather not use a terminal, double-click these in order:
 | `1-get-filters.bat` | Opens YouTube, watches for ads you are not blocking yet, writes them to `feed/discovered.json` |
 | `2-check.bat` | Runs every test. Tells you plainly whether it is safe to send out |
 | `3-send-it.bat` | Saves your changes and pushes them to GitHub, which publishes the new list |
+| `4-make-zip.bat` | Packs just the extension files into `adcuck-<version>.zip` for the Chrome Web Store |
 
 They install what they need on first run, so `1` and `2` will take a few
 minutes the first time and seconds afterwards. Everything below is the same
@@ -380,11 +381,18 @@ kind — nothing leaves the browser.
   limitation; they leave one-star reviews for a surprise.
 - **Single purpose:** "Blocks advertisements on youtube.com." That is the
   whole extension, which makes the justification easy.
-- **Package for upload** with the extension files only:
+- **Package for upload** with `4-make-zip.bat`, or on a Mac or Linux box:
 
   ```bash
   zip -r adcuck-store.zip manifest.json icons rules src
   ```
+
+  Either way the zip holds four things and nothing else: `manifest.json` at the
+  root, plus `icons/`, `rules/` and `src/`. Everything else in the repo is
+  build-time only — the store rejects packages carrying files the extension
+  never uses. The zip is verified by extracting it and loading *only* those
+  files as an extension: service worker starts, content scripts run, popup
+  opens, no errors.
 
 ## Layout
 
