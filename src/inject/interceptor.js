@@ -79,7 +79,8 @@
     "adPodIndexViewModel",
     "playerLegacyDesktopWatchAdsRenderer",
     "playerAdParams",
-    "adsEngagementPanelContentRenderer"
+    "adsEngagementPanelContentRenderer",
+    "clientForecastingAdRenderer"
   ];
 
   /* ---------------------------- ENFORCEMENT -----------------------------
