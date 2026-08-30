@@ -80,7 +80,9 @@
     "playerLegacyDesktopWatchAdsRenderer",
     "playerAdParams",
     "adsEngagementPanelContentRenderer",
-    "clientForecastingAdRenderer"
+    "clientForecastingAdRenderer",
+    "skipAdViewModel",
+    "skipAdButtonViewModel"
   ];
 
   /* ---------------------------- ENFORCEMENT -----------------------------
