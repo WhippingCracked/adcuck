@@ -23,6 +23,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REL = "src/filters/filters.js";
 const FILE = path.join(ROOT, REL);
 const FIX = process.argv.includes("--fix");
+/* A deliberate fresh run replaces the list, so it is smaller by design.
+ * Shrinking then is not a fault - it just must never happen silently. */
+const ALLOW_SHRINK = process.argv.includes("--allow-shrink");
 
 const load = (src) =>
   new Function("var globalThis = {};" + src + "\nreturn CB_FILTERS;")();
@@ -44,11 +47,11 @@ function restore() {
   execFileSync("git", ["checkout", "--", REL], { cwd: ROOT, stdio: "ignore" });
 }
 
-function die(lines) {
+function die(lines, code = 1) {
   console.error("");
   for (const l of lines) console.error("  " + l);
   console.error("");
-  process.exit(1);
+  process.exit(code);
 }
 
 /* --- is it even there? ------------------------------------------------- */
@@ -110,7 +113,12 @@ if (head) {
     (s) => !now.response.adMarkers.includes(s)
   );
   if (lost.length || lostKeys.length) {
-    die([
+    if (ALLOW_SHRINK) {
+      console.log(
+        `  Note: ${lost.length + lostKeys.length} filter(s) are no longer in the ` +
+          `list compared with your last save.`
+      );
+    } else die([
       `${lost.length + lostKeys.length} filter(s) have gone missing since your last save.`,
       "",
       ...lost.slice(0, 12).map((s) => "    " + s),
@@ -121,7 +129,7 @@ if (head) {
       "  If you did not, put them back with:",
       "",
       "      git checkout -- src/filters/filters.js"
-    ]);
+    ], 2);
   }
 }
 

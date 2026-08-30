@@ -40,8 +40,19 @@ const DEFAULT_PAGES = [
   "https://www.youtube.com/results?search_query=news"
 ];
 
-const PAGES = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_PAGES;
 const isWatch = (u) => /[?&]v=|\/shorts\//.test(u);
+
+/* A link you give is visited FIRST, and the feeds are still visited after it.
+ *
+ * They find different families of ad: the pre-roll and the in-player
+ * furniture only exist on a watch page, and the banner/promo units only exist
+ * on the feeds. That did not matter much when runs piled onto an existing
+ * list, but a fresh run writes down only what it sees - so a run that skipped
+ * the feeds would silently drop every banner filter you had. */
+const given = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const PAGES = given.length
+  ? [...given, ...DEFAULT_PAGES.filter((p) => !isWatch(p))]
+  : DEFAULT_PAGES;
 
 function loadCurrent() {
   const src = fs.readFileSync(path.join(ROOT, "src/filters/filters.js"), "utf8");
@@ -49,6 +60,21 @@ function loadCurrent() {
 }
 
 const known = knownFrom(loadCurrent());
+
+/* Collect EVERYTHING ad-shaped, not just what is missing from the current
+ * list.
+ *
+ * This used to skip anything already covered, which was right when a run only
+ * ever added to the list. It is wrong now that a run can replace it: an ad
+ * that is still on the page but already in your filters would be left out of
+ * the findings, and a fresh run would then drop the filter for it. The list
+ * would get worse every single time you refreshed it.
+ *
+ * So the findings are the whole picture of what this run saw, and deciding
+ * what is new is left to the report below and to add-filters.mjs. */
+const nothingKnown = { keys: new Set(), tags: new Set(), classes: new Set() };
+const isNew = (v) =>
+  !known.keys.has(v) && !known.tags.has(v) && !known.classes.has(v.replace(/^\./, ""));
 
 const seenKeys = new Map();     // renderer name -> times seen
 const seenTags = new Map();     // element name  -> most seen at once
@@ -116,7 +142,7 @@ const page = await ctx.newPage();
 page.on("response", async (res) => {
   if (!/\/youtubei\/v1\/(player|browse|next|search|reel)/.test(res.url())) return;
   try {
-    collectKeys(await res.json(), known, seenKeys, samples);
+    collectKeys(await res.json(), nothingKnown, seenKeys, samples);
   } catch (e) {
     /* not JSON, or the page went away mid-flight */
   }
@@ -148,19 +174,19 @@ for (const url of PAGES) {
      * miss every one of them, so sample repeatedly and keep the union. */
     const rounds = watch ? 12 : 4;
     for (let i = 0; i < rounds; i++) {
-      collectDom(await page.evaluate(scrapeDom), known, seenTags, seenClasses);
+      collectDom(await page.evaluate(scrapeDom), nothingKnown, seenTags, seenClasses);
       if (!watch && i === 1) await page.mouse.wheel(0, 4000);
       await page.waitForTimeout(1500);
     }
-    collectDom(await page.evaluate(scrapeDom), known, seenTags, seenClasses);
+    collectDom(await page.evaluate(scrapeDom), nothingKnown, seenTags, seenClasses);
 
     /* The inline bootstrap payloads never travel as a response. */
     const inline = await page.evaluate(() => ({
       player: window.ytInitialPlayerResponse || null,
       data: window.ytInitialData || null
     }));
-    collectKeys(inline.player, known, seenKeys, samples);
-    collectKeys(inline.data, known, seenKeys, samples);
+    collectKeys(inline.player, nothingKnown, seenKeys, samples);
+    collectKeys(inline.data, nothingKnown, seenKeys, samples);
   } catch (e) {
     console.error(`  failed: ${e.message}`);
   }
@@ -170,17 +196,17 @@ await browser.close();
 
 const byCount = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
 
-console.log("\n=== response fields not in the current list ===");
-if (!seenKeys.size) console.log("  none - the list covers everything seen");
+console.log("\n=== ad fields seen  (* = not in your current list) ===");
+if (!seenKeys.size) console.log("  none");
 for (const [k, n] of byCount(seenKeys)) {
-  console.log(`  ${String(n).padStart(4)}x  ${k}`);
+  console.log(`  ${isNew(k) ? "*" : " "} ${String(n).padStart(4)}x  ${k}`);
   console.log(`        ${samples.get(k)}`);
 }
 
-console.log("\n=== elements not in the current list ===");
+console.log("\n=== ad elements seen  (* = not in your current list) ===");
 if (!seenTags.size && !seenClasses.size) console.log("  none");
-for (const [t, n] of byCount(seenTags)) console.log(`  ${String(n).padStart(4)}x  ${t}`);
-for (const [c, n] of byCount(seenClasses)) console.log(`  ${String(n).padStart(4)}x  .${c}`);
+for (const [t, n] of byCount(seenTags)) console.log(`  ${isNew(t) ? "*" : " "} ${String(n).padStart(4)}x  ${t}`);
+for (const [c, n] of byCount(seenClasses)) console.log(`  ${isNew("." + c) ? "*" : " "} ${String(n).padStart(4)}x  .${c}`);
 
 const proposal = {
   adMarkers: byCount(seenKeys).map(([k]) => k),

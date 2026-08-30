@@ -217,8 +217,37 @@ ok(verdict("ytd-rich-item-renderer:has(ytd-ad-slot-renderer)") === "add",
 const shipped = F.hide.concat(F.remove).filter((s) => verdict(s) === "refuse");
 ok(shipped.length === 0, `nothing shipped is refused (${shipped.join(", ")})`);
 
-ok(/--auto/.test(fs.readFileSync(path.join(ROOT, "1-get-filters.bat"), "utf8")),
-   "1-get-filters.bat adds without asking");
+const bat = fs.readFileSync(path.join(ROOT, "1-get-filters.bat"), "utf8");
+ok(/--auto/.test(bat), "1-get-filters.bat adds without asking");
+ok(/--fresh/.test(bat), "...and rebuilds the list rather than piling onto it");
+
+/* ---------- a fresh run must not lose what it cannot rediscover ---------- */
+
+/* These are the reason a wipe is not simply "empty the file". Nothing on an
+ * ordinary page mentions them, so no run can ever put them back. */
+const reset = fs.readFileSync(path.join(ROOT, "tools/reset-filters.mjs"), "utf8");
+ok(/rewriteArray\(src, "hide", \[\]\)/.test(reset), "reset clears the page filters");
+ok(/rewriteArray\(next, "adMarkers", \[\]\)/.test(reset), "...and the field names");
+ok(!/rewriteArray\([^)]*"playerKeys"/.test(reset), "reset never clears the player fields");
+ok(!/rewriteArray\([^)]*"remove"/.test(reset), "reset never clears the removal rules");
+ok(/playerKeys were touched|the player fields were touched/.test(reset),
+   "...and it checks that they survived");
+
+const adder = fs.readFileSync(path.join(ROOT, "tools/add-filters.mjs"), "utf8");
+ok(/the player fields were touched/.test(adder),
+   "a fresh run checks the player fields survived");
+ok(/the removal rules were touched/.test(adder),
+   "...and that the removal rules survived");
+
+/* Discovery must report everything it sees, not only what is missing. If it
+ * filtered against the current list, a fresh run would drop the filter for
+ * every ad that is still on the page - the list would rot a little each time
+ * it was refreshed. */
+ok(/nothingKnown/.test(dsrc), "discovery reports ads it already covers too");
+ok(/collectDom\([^,]+, nothingKnown/.test(dsrc), "...for elements");
+ok(/collectKeys\([^,]+, nothingKnown/.test(dsrc), "...and for response fields");
+ok(/DEFAULT_PAGES\.filter\(\(p\) => !isWatch\(p\)\)/.test(dsrc),
+   "a link you give still visits the feeds afterwards");
 
 console.log(`\n${pass}/${pass + fail} checks passed`);
 process.exit(fail ? 1 : 0);

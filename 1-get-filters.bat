@@ -53,7 +53,7 @@ REM --- Is the filter list all right before we add to it? -----
 REM  It has gone missing on this machine before. Better to put
 REM  it back now than to fail halfway through with a wall of
 REM  red text.
-call node tools/guard-filters.mjs --fix
+call node tools/guard-filters.mjs --fix --allow-shrink
 if errorlevel 1 (
   echo.
   echo  Fix that first, then run this again.
@@ -93,8 +93,16 @@ if errorlevel 1 (
 
 echo.
 echo  ============================================
-echo   Adding what it found
+echo   Rebuilding your filter list
 echo  ============================================
+echo.
+echo  This REPLACES your ad filters with what it just found,
+echo  so the list stays a picture of YouTube as it is now
+echo  instead of everything it has ever been.
+echo.
+echo  Kept either way: the player fields and the anti-adblock
+echo  rules. Those cannot be found by looking at a page, so
+echo  they are never cleared.
 echo.
 echo  Anything that is clearly an advert goes straight in.
 echo.
@@ -107,7 +115,7 @@ echo  Those are set aside rather than added. Run  npm run add
 echo  if you want to go through those yourself.
 echo.
 
-call node tools/add-filters.mjs --auto
+call node tools/add-filters.mjs --auto --fresh
 if errorlevel 1 (
   echo.
   echo  [X] Nothing was added. The message above says why.
@@ -120,7 +128,7 @@ echo  ============================================
 echo   Done
 echo  ============================================
 echo.
-echo  Anything you said yes to is now in your filter list.
+echo  Your filter list is now exactly what this run found.
 echo.
 echo  Next: run  2-check.bat
 echo.

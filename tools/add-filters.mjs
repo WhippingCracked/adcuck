@@ -18,88 +18,24 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { sync } from "./sync-interceptor.mjs";
 import { verdict } from "./never-block.mjs";
+import {
+  ROOT, FILTERS, load, readFilters, rewriteArray, appendTo, writeChecked
+} from "./edit-filters.mjs";
 
 /* --auto adds what is unambiguously an advert without asking. 1-get-filters
  * uses it; `npm run add` without it still walks you through one at a time. */
 const AUTO = process.argv.includes("--auto");
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const FILTERS = path.join(ROOT, "src/filters/filters.js");
-const FOUND = path.join(ROOT, "feed/discovered.json");
-
-function load(src) {
-  return new Function("var globalThis = {};" + src + "\nreturn CB_FILTERS;")();
-}
-
-/* Find the array literal for `key` and return the span between its brackets.
- * Brackets inside string literals do not count - selectors like
- * ytd-thing[target-id='x'] are full of them, and a naive counter walks
- * straight off the end of the file. */
-function arraySpan(src, key) {
-  const open = src.indexOf(key + ": [");
-  if (open === -1) return null;
-  let i = src.indexOf("[", open);
-  const from = i;
-  let depth = 0;
-  let quote = null;
-
-  for (; i < src.length; i++) {
-    const c = src[i];
-    if (quote) {
-      if (c === "\\") i++;
-      else if (c === quote) quote = null;
-      continue;
-    }
-    if (c === '"' || c === "'" || c === "`") { quote = c; continue; }
-    if (c === "[") depth++;
-    else if (c === "]") {
-      depth--;
-      if (depth === 0) return { from, to: i };
-    }
-  }
-  return null;
-}
-
-/* Record when the list was last edited.
+/* --fresh REPLACES the ad filters with what this run found, instead of adding
+ * to what was already there. It is what keeps the list a picture of YouTube
+ * as it is now rather than a pile of everything it has ever been.
  *
- * The extension checks a published feed and replaces its bundled filters with
- * whatever is there. Between editing this file and remembering to push it,
- * the published list is OLDER than the bundled one - and without a timestamp
- * to compare, a fresh install throws away the good list for the stale one and
- * says nothing. src/content/bridge.js refuses a feed built before this stamp,
- * which is only possible if the stamp is written. */
-function stampEdited(src) {
-  const now = new Date();
-  const day = now.toISOString().slice(0, 10).replace(/-/g, ".");
-  const iso = now.toISOString();
+ * It only ever clears the two lists a run can rebuild. The player fields, the
+ * removal rules and the enforcement wording are never touched - nothing on an
+ * ordinary page would ever put those back. */
+const FRESH = process.argv.includes("--fresh");
 
-  let out = src.replace(/version:\s*"[^"]*"/, `version: "${day}"`);
-  if (/editedAt:\s*"[^"]*"/.test(out)) {
-    return out.replace(/editedAt:\s*"[^"]*"/, `editedAt: "${iso}"`);
-  }
-  return out.replace(
-    /(version:\s*"[^"]*",)/,
-    `$1\n\n  /* When this list was last edited. A published feed built before\n` +
-      `   * this is stale, and is ignored rather than applied. */\n` +
-      `  editedAt: "${iso}",`
-  );
-}
-
-function insertInto(src, key, items) {
-  if (!items.length) return src;
-  const span = arraySpan(src, key);
-  if (!span) throw new Error(`could not find the ${key} list in filters.js`);
-
-  const body = src.slice(span.from + 1, span.to);
-  const lines = body.split("\n").filter((l) => l.trim());
-  const last = lines[lines.length - 1] || '    ""';
-  const indent = (last.match(/^\s*/) || ["    "])[0];
-
-  const additions = items.map((v) => `${indent}${JSON.stringify(v)}`).join(",\n");
-  const joined = body.trimEnd().replace(/,\s*$/, "") + ",\n" + additions + "\n" + indent.slice(0, -2);
-
-  return src.slice(0, span.from + 1) + joined + src.slice(span.to);
-}
+const FOUND = path.join(ROOT, "feed/discovered.json");
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -131,12 +67,15 @@ if (!fs.existsSync(FOUND)) {
 }
 
 const found = JSON.parse(fs.readFileSync(FOUND, "utf8"));
-const src = fs.readFileSync(FILTERS, "utf8");
-const current = load(src);
+const { src, filters: current } = readFilters();
 
-/* Anything already covered is not worth asking about. */
-const haveHide = new Set(current.hide.concat(current.remove));
-const haveKeys = new Set(current.response.adMarkers.concat(current.response.playerKeys));
+/* Anything already covered is not worth asking about - unless the list is
+ * about to be replaced, in which case everything found has to be considered
+ * again or it would be dropped for being "already there". */
+const haveHide = FRESH ? new Set(current.remove) : new Set(current.hide.concat(current.remove));
+const haveKeys = FRESH
+  ? new Set(current.response.playerKeys)
+  : new Set(current.response.adMarkers.concat(current.response.playerKeys));
 
 const candidates = [
   ...(found.hide || [])
@@ -216,45 +155,62 @@ if (!total) {
   process.exit(0);
 }
 
-/* Back up, write, then prove the result still loads. */
-const backup = FILTERS + ".backup";
-fs.writeFileSync(backup, src);
-
+/* Write it, then prove the result still loads and says what it should. */
 try {
   let next = src;
-  next = insertInto(next, "hide", accept.hide);
-  next = insertInto(next, "adMarkers", accept.adMarkers);
-  next = stampEdited(next);
-  fs.writeFileSync(FILTERS, next);
-
-  const after = load(fs.readFileSync(FILTERS, "utf8"));
-  if (!after.editedAt) throw new Error("the edit stamp did not get written");
-  for (const v of accept.hide) {
-    if (!after.hide.includes(v)) throw new Error(`${v} did not make it into the list`);
-  }
-  for (const v of accept.adMarkers) {
-    if (!after.response.adMarkers.includes(v)) throw new Error(`${v} did not make it into the list`);
-  }
-  if (after.hide.length !== current.hide.length + accept.hide.length) {
-    throw new Error("the list came out the wrong length");
+  if (FRESH) {
+    next = rewriteArray(next, "hide", accept.hide);
+    next = rewriteArray(next, "adMarkers", accept.adMarkers);
+  } else {
+    next = appendTo(next, "hide", accept.hide);
+    next = appendTo(next, "adMarkers", accept.adMarkers);
   }
 
-  /* The part of the extension that runs first carries its own copy of these
-   * lists - it starts before anything can hand it filters.js. Editing one
-   * copy and not the other is how you end up with new filters that quietly
-   * do nothing, so both are written together or neither is. */
-  sync();
+  const wantHide = FRESH ? accept.hide.length : current.hide.length + accept.hide.length;
+  const wantKeys = FRESH
+    ? accept.adMarkers.length
+    : current.response.adMarkers.length + accept.adMarkers.length;
 
-  fs.rmSync(backup);
+  writeChecked(src, next, (after) => {
+    for (const v of accept.hide) {
+      if (!after.hide.includes(v)) throw new Error(`${v} did not make it into the list`);
+    }
+    for (const v of accept.adMarkers) {
+      if (!after.response.adMarkers.includes(v)) throw new Error(`${v} did not make it into the list`);
+    }
+    if (after.hide.length !== wantHide) throw new Error("the list came out the wrong length");
+    if (after.response.adMarkers.length !== wantKeys) {
+      throw new Error("the field names came out the wrong length");
+    }
+    /* Whatever else happens, these must survive a fresh run untouched. */
+    if (after.response.playerKeys.length !== current.response.playerKeys.length) {
+      throw new Error("the player fields were touched");
+    }
+    if (after.remove.length !== current.remove.length) {
+      throw new Error("the removal rules were touched");
+    }
+
+    /* The part of the extension that runs first carries its own copy of the
+     * field names - it starts before anything can hand it filters.js. Editing
+     * one copy and not the other leaves new filters that quietly do nothing.
+     *
+     * It sits inside the check on purpose: anything that throws in here puts
+     * filters.js back, so the two files are written together or neither is. */
+    sync();
+  });
+
   reportSkipped();
-  console.log(`\n  Added ${total} filter(s) to src/filters/filters.js\n`);
+  console.log(
+    FRESH
+      ? `\n  Filter list replaced - ${total} filter(s), found on this run:\n`
+      : `\n  Added ${total} filter(s) to src/filters/filters.js\n`
+  );
   accept.hide.forEach((v) => console.log(`    ${v}`));
   accept.adMarkers.forEach((v) => console.log(`    ${v}`));
   console.log("\n  Next: run 2-check.bat, then 3-send-it.bat");
   console.log("  To undo all of it:  git checkout src/filters/filters.js\n");
 } catch (err) {
-  fs.copyFileSync(backup, FILTERS);
-  fs.rmSync(backup);
+  /* writeChecked has already put the original back. */
   console.error(`\n  Could not edit the file safely: ${err.message}`);
   console.error("  Nothing was changed - filters.js is exactly as it was.\n");
   process.exit(1);

@@ -269,6 +269,39 @@ every one of those real names, so the list cannot quietly stop covering them.
 Without `--auto` you get the old behaviour: one at a time, `y` to block it,
 `n` to leave it, `q` to stop.
 
+#### Fresh, not accumulated
+
+`1-get-filters.bat` passes `--fresh`, which **replaces** `hide` and
+`adMarkers` with what this run saw rather than adding to them. The list stays
+a picture of YouTube as it is now instead of everything it has ever been.
+
+Two things make that safe rather than lossy:
+
+- **Discovery reports every ad it sees, not just the unfamiliar ones.** If it
+  only reported what was missing from your list, a fresh run would drop the
+  filter for every ad that is still on the page, and the list would rot a
+  little each time you refreshed it. The `*` in its output marks the ones that
+  are new to you.
+- **A link you give is visited first, then the feeds anyway.** Watch pages and
+  feeds carry different families of ad, and a fresh run that skipped the feeds
+  would quietly throw away every banner filter.
+
+`npm run reset` empties the two lists on demand, and `npm run add` still
+appends rather than replacing.
+
+**What a fresh run never clears**, because nothing on an ordinary page could
+put it back:
+
+| | |
+|---|---|
+| `response.playerKeys` | `adPlacements`, `adSlots`, `playerAds`… — this *is* the ad blocking. Clear these and the player goes back to playing adverts |
+| `remove` | The anti-adblock dialog, and the grid cells that would otherwise be left as empty gaps |
+| `enforcement` | The wording of "ad blockers are not allowed", which only appears once you are already blocking |
+| `unlock` | Undoing the scroll lock that dialog leaves behind |
+
+Both the reset and the fresh run check those survived and roll back if they
+did not.
+
 Either way, what you approve is written into the right list in
 `src/filters/filters.js`, keeping that file's existing indentation, and
 `git checkout src/filters/filters.js` undoes the lot.
@@ -569,6 +602,8 @@ tools/
   add-filters.mjs            adds findings, edits filters.js
   never-block.mjs            what must never be added, and what is safe to
   guard-filters.mjs          refuses to run on a damaged or shrunken list
+  reset-filters.mjs          empties the ad filters, keeps what can't be found
+  edit-filters.mjs           the one safe way to rewrite filters.js
   sync-interceptor.mjs       keeps interceptor.js's copy in step
   build-feed.mjs             builds the published OTA feed
 test/e2e.mjs                 32-check Chromium suite

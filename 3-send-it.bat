@@ -114,7 +114,19 @@ if defined FILTERS (
   REM missing ones until the ads come back, and by then everyone
   REM has them.
   call node tools/guard-filters.mjs
-  if errorlevel 1 (
+  REM errorlevel 2 means the list got SMALLER. After a fresh run that
+  REM is on purpose, so ask rather than refuse. errorlevel 1 means it
+  REM is missing or broken, which is never on purpose.
+  if errorlevel 2 (
+    choice /c YN /n /m "  Send the smaller list anyway? [Y/N] "
+    if errorlevel 2 (
+      echo.
+      echo  Stopped. Nothing was sent.
+      echo.
+      pause
+      exit /b 1
+    )
+  ) else if errorlevel 1 (
     echo.
     echo  Stopped. Nothing was sent.
     echo.
