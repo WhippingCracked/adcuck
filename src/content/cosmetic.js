@@ -150,8 +150,69 @@
     return hit;
   }
 
+  /* ------------------------------------------------------------------ *
+   * Never hide the thing people came here to watch
+   *
+   * A filter list is a list of guesses, and one of them will eventually match
+   * the player. It already has: "ad-created" is not an ad element, it is a
+   * state class YouTube puts ON the player once its ad module exists - so
+   * hiding it hid the whole player. The video kept decoding, so the sound
+   * carried on and the ambient glow (which is drawn outside the player) kept
+   * moving. Everything looked alive except the picture.
+   *
+   * Nothing catches that: the player reports no error, so the ad-free
+   * fallback never fires, and the extension has no idea anything is wrong.
+   *
+   * So rather than try to guess every such class in advance - the last three
+   * were all things nobody thought of - check the outcome. If the player is
+   * not visible and one of OUR rules is why, drop that rule and say which.
+   * That holds for filters from the feed as well as ones added locally.
+   * ------------------------------------------------------------------ */
+  function guardPlayer() {
+    if (!styleEl || !styleEl.sheet || styleEl.disabled) return;
+
+    var video = document.querySelector("video");
+    if (!video || !video.duration) return; // nothing playing yet
+
+    /* Walk up from the video. Anything between it and the document that our
+     * stylesheet hides is a mistake, whatever its name looked like. */
+    var culprits = [];
+    for (var el = video; el && el.nodeType === 1; el = el.parentElement) {
+      if (getComputedStyle(el).display !== "none") continue;
+      var rules = styleEl.sheet.cssRules;
+      for (var i = rules.length - 1; i >= 0; i--) {
+        var sel = rules[i].selectorText;
+        if (!sel) continue;
+        try {
+          if (!el.matches(sel)) continue;
+        } catch (e) {
+          continue;
+        }
+        culprits.push(sel);
+        styleEl.sheet.deleteRule(i);
+      }
+    }
+    if (!culprits.length) return;
+
+    /* Keep it out of the list for the rest of the page, so a rebuild from the
+     * feed does not put it straight back. */
+    F.hide = F.hide.filter(function (s) { return culprits.indexOf(s) === -1; });
+    dropped = dropped.concat(culprits);
+    applied = Math.max(0, applied - culprits.length);
+    console.warn(
+      "AdCuck: dropped " + culprits.length + " filter(s) that were hiding the " +
+        "video player, not an advert:", culprits.join(", ")
+    );
+    try {
+      document.documentElement.dataset.cbUnhid = culprits.join(",");
+    } catch (e) {
+      /* the readout is a convenience, not a job */
+    }
+  }
+
   function sweep() {
     scheduled = false;
+    guardPlayer();
     var removedAny = sweepEnforcement();
 
     for (var i = 0; i < removeSelectors.length; i++) {
@@ -234,6 +295,16 @@
       childList: true,
       subtree: true
     });
+
+    /* Check the moment playback starts, not just when the page happens to
+     * mutate. A hidden player is exactly the case where YouTube may stop
+     * updating the DOM, so waiting for a mutation to notice a hidden player
+     * is waiting for the thing that will not come. Media events do not
+     * bubble, hence the capture phase. */
+    ["loadeddata", "playing", "timeupdate"].forEach(function (e) {
+      document.addEventListener(e, schedule, true);
+    });
+
     schedule();
   }
 

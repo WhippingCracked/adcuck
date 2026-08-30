@@ -46,7 +46,18 @@ export const PROTECTED = new Set([
   "ytd-player", "player", "movie_player", "html5-video-player", "video-stream",
   "video", "yt-progress-bar-playhead",
   /* things already taken back out by hand - they must not come back */
-  "ytp-paid-content-overlay", "ytp-skip-ad", "ytp-skip-ad-button"
+  "ytp-paid-content-overlay", "ytp-skip-ad", "ytp-skip-ad-button",
+
+  /* Player STATE classes. These are the nastiest kind of false positive,
+   * because they are named after ads but sit ON the player: YouTube adds them
+   * to #movie_player while an ad exists, and takes them off afterwards.
+   * Hiding one hides the entire player. The video keeps decoding, so the
+   * sound carries on and the ambient glow keeps moving, and the only symptom
+   * is that the picture is gone - which nothing reports as an error.
+   *
+   * "ad-created" got into a real filter list this way. */
+  "ad-created", "ad-showing", "ad-interrupting", "ad-active", "ad-holiday",
+  "ytp-ad-showing", "ytp-ad-interrupting", "ad-preview", "ad-enabled"
 ]);
 
 /* Whole families of player furniture. A prefix here protects everything under

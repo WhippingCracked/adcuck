@@ -213,6 +213,9 @@ const MUST_REFUSE = [
   ".ytp-skip-ad", ".ytp-skip-ad-button", ".ytp-skip-ad-button__text",
   ".ytp-chrome-bottom", ".ytp-progress-bar", ".ytp-play-button",
   ".ytp-time-current", ".ytp-volume-panel", ".ytp-fullscreen-button",
+  /* Player state classes: named after ads, but they sit ON the player, so
+   * hiding one hides the whole video. "ad-created" reached a real list. */
+  ".ad-created", ".ad-showing", ".ad-interrupting", ".ytp-ad-showing",
   "ytd-watch-flexy", "ytd-app", "ytd-browse", "ytd-page-manager",
   "ytd-rich-grid-renderer", "ytd-rich-item-renderer", "ytd-video-renderer",
   "ytd-thumbnail", "ytd-player", "video", "body", "html", "*"
@@ -225,6 +228,8 @@ const MUST_ADD = [
   "yt-mealbar-promo-renderer", ".ytp-ad-module", ".ytp-ad-overlay-container",
   ".ytwAdBadgeViewModelHost", ".ytwAdImageViewModelHostImageContainer",
   "adImageViewModel", "adPlacementRenderer", "displayAdRenderer",
+  /* real ad containers inside the player - these must still get through */
+  ".video-ads", ".ytp-ad-progress-list", ".ytp-ad-player-overlay-layout",
   /* the ad word is in the part that narrows it down, not the first name */
   "ytd-rich-item-renderer:has(ytd-ad-slot-renderer)",
   "#panels-full-bleed-container ytd-ad-slot-renderer",

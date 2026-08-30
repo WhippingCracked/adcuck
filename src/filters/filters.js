@@ -11,12 +11,11 @@ var CB_FILTERS = {
 
   /* When this list was last edited. A published feed built before
    * this is stale, and is ignored rather than applied. */
-  editedAt: "2026-08-30T14:44:47.737Z",
+  editedAt: "2026-08-30T14:58:08.204Z",
 
   /* Hidden with CSS. Cheap, reversible, no layout thrash. */
   hide: [
     "ytd-ads-engagement-panel-content-renderer",
-    ".ad-created",
     ".video-ads",
     ".ytp-ad-module",
     ".ytp-featured-product-price-when-promotion-text-enabled",

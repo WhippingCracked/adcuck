@@ -14,6 +14,13 @@
  */
 var CHANGELOG = [
   {
+    version: "1.9.2",
+    date: "30 Aug 2026",
+    changes: [
+      "Fixed the picture vanishing while the sound kept playing."
+    ]
+  },
+  {
     version: "1.9.1",
     date: "29 Aug 2026",
     changes: [

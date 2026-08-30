@@ -635,6 +635,48 @@ check("L3 removes the ad-only grid cell", cosmetic.richad === true);
 check("L3 removes the masthead ad", cosmetic.mastheadad === true);
 check("L3 leaves real content visible", cosmetic.realvideo === false, `hidden=${cosmetic.realvideo}`);
 
+/* --- a filter must never hide the player -------------------------------
+ *
+ * This is the "I can hear it but I cannot see it" bug. "ad-created" is not an
+ * ad element, it is a state class on the player itself, so hiding it hid the
+ * whole player - while the video carried on decoding, so the sound and the
+ * ambient glow both looked perfectly normal. Nothing detected it: the player
+ * reports no error, so the ad-free fallback never fires either.
+ *
+ * Here the rule is added at runtime rather than through the filter list,
+ * because the point is that it works whatever the source - a local mistake,
+ * or something that arrives from the feed later. */
+const rescued = await page.evaluate(async () => {
+  const sheet = document.getElementById("cb-cosmetic").sheet;
+  sheet.insertRule("#movie_player { display: none !important; }", sheet.cssRules.length);
+
+  const player = document.getElementById("movie_player");
+  const before = getComputedStyle(player).display;
+
+  /* Nudge the page so the sweep runs, the way playback would. */
+  document.querySelector("video").dispatchEvent(new Event("timeupdate"));
+  document.body.appendChild(document.createElement("div"));
+
+  for (let i = 0; i < 60 && getComputedStyle(player).display === "none"; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return {
+    before,
+    after: getComputedStyle(player).display,
+    reported: document.documentElement.dataset.cbUnhid || ""
+  };
+});
+check(
+  "A filter that hides the player is thrown out",
+  rescued.before === "none" && rescued.after !== "none",
+  `${rescued.before} -> ${rescued.after}`
+);
+check(
+  "...and it says which filter did it",
+  rescued.reported.includes("#movie_player"),
+  rescued.reported || "(nothing reported)"
+);
+
 /* --- L4: watchdog ------------------------------------------------------ */
 const watchdog = await page.evaluate(() => {
   const v = document.getElementById("v");

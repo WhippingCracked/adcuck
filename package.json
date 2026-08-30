@@ -1,6 +1,6 @@
 {
   "name": "adcuck",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "private": true,
   "description": "YouTube ad blocker for Chrome (Manifest V3). Made by Archie.",
   "scripts": {
