@@ -110,6 +110,18 @@ if not defined FILTERS if not defined SENDOTHERS (
 )
 
 if defined FILTERS (
+  REM Never push a list that has lost filters. Nobody notices
+  REM missing ones until the ads come back, and by then everyone
+  REM has them.
+  call node tools/guard-filters.mjs
+  if errorlevel 1 (
+    echo.
+    echo  Stopped. Nothing was sent.
+    echo.
+    pause
+    exit /b 1
+  )
+  echo.
   echo  Reminder: have you run 2-check.bat since editing the
   echo  filters? A broken list reaches everyone.
   echo.

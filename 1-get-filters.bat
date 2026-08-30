@@ -49,6 +49,20 @@ if not exist "node_modules\playwright" (
   echo.
 )
 
+REM --- Is the filter list all right before we add to it? -----
+REM  It has gone missing on this machine before. Better to put
+REM  it back now than to fail halfway through with a wall of
+REM  red text.
+call node tools/guard-filters.mjs --fix
+if errorlevel 1 (
+  echo.
+  echo  Fix that first, then run this again.
+  echo.
+  pause
+  exit /b 1
+)
+echo.
+
 REM --- Which video to watch ---------------------------------
 REM  Most YouTube ads only exist while a video is playing, so
 REM  this opens a video and sits through the advert. Pasting a

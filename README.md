@@ -54,6 +54,7 @@ If you would rather not use a terminal, double-click these in order:
 |---|---|
 | `1-get-filters.bat` | Asks for a video link, sits through the ads on it, then adds what it found to `filters.js` by itself. Parts of YouTube are refused outright and listed |
 | `2-check.bat` | Runs every test. Tells you plainly whether it is safe to send out |
+| `npm run guard` | Checks the filter list is present, loads, and has not lost anything since your last save. `1`, `2` and `3` all run it first |
 | `3-send-it.bat` | Sends **just the filter files** to GitHub, which republishes the list. Anything else you have been editing is listed and left alone unless you say otherwise |
 | `4-make-zip.bat` | Packs just the extension files into `adcuck-<version>.zip` for the Chrome Web Store |
 
@@ -567,6 +568,7 @@ tools/
   discover-match.mjs         decides what counts as ad-shaped
   add-filters.mjs            adds findings, edits filters.js
   never-block.mjs            what must never be added, and what is safe to
+  guard-filters.mjs          refuses to run on a damaged or shrunken list
   sync-interceptor.mjs       keeps interceptor.js's copy in step
   build-feed.mjs             builds the published OTA feed
 test/e2e.mjs                 32-check Chromium suite

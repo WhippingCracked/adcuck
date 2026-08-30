@@ -4,15 +4,16 @@
   "private": true,
   "description": "YouTube ad blocker for Chrome (Manifest V3). Made by Archie.",
   "scripts": {
-    "test": "node tools/build-feed.mjs && node test/discover.mjs && node test/sponsors.mjs && node test/e2e.mjs && node test/bench.mjs",
-    "test:ci": "node tools/build-feed.mjs && node test/discover.mjs && node test/sponsors.mjs && xvfb-run -a node test/e2e.mjs && node test/bench.mjs",
+    "test": "node tools/guard-filters.mjs && node tools/build-feed.mjs && node test/discover.mjs && node test/sponsors.mjs && node test/e2e.mjs && node test/bench.mjs",
+    "test:ci": "node tools/guard-filters.mjs && node tools/build-feed.mjs && node test/discover.mjs && node test/sponsors.mjs && xvfb-run -a node test/e2e.mjs && node test/bench.mjs",
     "bench": "node test/bench.mjs",
     "feed": "node tools/build-feed.mjs",
     "discover": "node tools/discover.mjs",
     "add": "node tools/add-filters.mjs",
     "sync": "node tools/sync-interceptor.mjs",
     "icons": "python3 tools/make-icons.py",
-    "setup": "npm install && npx playwright install chromium"
+    "setup": "npm install && npx playwright install chromium",
+    "guard": "node tools/guard-filters.mjs"
   },
   "devDependencies": {
     "playwright": "^1.56.0"
