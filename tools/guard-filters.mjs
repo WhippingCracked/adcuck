@@ -95,8 +95,34 @@ try {
   ]);
 }
 
-if (!Array.isArray(now.hide) || !now.hide.length) {
-  die(["Your filter list is empty.", "", "      git checkout -- src/filters/filters.js"]);
+/* --- empty ------------------------------------------------------------
+ *
+ * Empty is not damaged. It is exactly what a reset leaves behind, and
+ * 1-get-filters is the thing that fills it back up - so refusing to run on an
+ * empty list locks you out of the only way to fix it. (It did. Sorry.)
+ *
+ * Before a run: say so and carry on. Before a push: stop, because an empty
+ * list published to everyone turns their ad blocking off. */
+if (!Array.isArray(now.hide)) {
+  die(["Your filter list is damaged - the hide list is not a list at all."]);
+}
+
+if (!now.hide.length) {
+  if (ALLOW_SHRINK) {
+    console.log("  Filter list is empty - a run will fill it back up.");
+  } else {
+    die([
+      "Your filter list is empty.",
+      "",
+      "  Nothing would be blocked. Sending this to everyone would turn",
+      "  their ad blocking off.",
+      "",
+      "  Run 1-get-filters.bat to fill it back up, or put your old list",
+      "  back with:",
+      "",
+      "      git checkout -- src/filters/filters.js"
+    ], 2);
+  }
 }
 
 /* --- has it shrunk since the last save? --------------------------------
@@ -133,7 +159,11 @@ if (head) {
   }
 }
 
-console.log(
-  `  Filter list looks fine - ${now.hide.length} to hide, ` +
-    `${now.response.adMarkers.length} field names.`
-);
+/* Saying "looks fine - 0 to hide" two lines after "the list is empty" reads
+ * as the tool contradicting itself. It already said its piece. */
+if (now.hide.length) {
+  console.log(
+    `  Filter list looks fine - ${now.hide.length} to hide, ` +
+      `${now.response.adMarkers.length} field names.`
+  );
+}
