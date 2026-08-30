@@ -21,6 +21,28 @@ function check(name, pass, detail = "") {
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? "  - " + detail : ""}`);
 }
 
+const FILTERS = new Function(
+  "var globalThis = {};" +
+    fs.readFileSync(path.join(ROOT, "src/filters/filters.js"), "utf8") +
+    "\nreturn CB_FILTERS;"
+)();
+
+/* The fixtures below used to hard-code "adSlotRenderer". That was fine while
+ * the filter list only ever grew, but a run now rebuilds it from whatever
+ * YouTube happened to show that day - so naming any one marker and demanding
+ * the extension strip it tests the weather, not the code. Take the marker
+ * from the list that actually shipped instead. */
+if (!FILTERS.hide.length || !FILTERS.response.adMarkers.length) {
+  console.error("\n  Your filter list is empty, so there is nothing here to test.");
+  console.error("  Nothing would be blocked at all.\n");
+  console.error("  Run 1-get-filters.bat to fill it back up, then check again.\n");
+  process.exit(1);
+}
+const AD_MARKER = FILTERS.response.adMarkers[0];
+/* A second, different marker where the fixture needs one - falling back to
+ * the first if the list only has one entry. */
+const AD_MARKER_2 = FILTERS.response.adMarkers[1] || AD_MARKER;
+
 const PLAYER_RESPONSE = {
   responseContext: {},
   playabilityStatus: {
@@ -30,7 +52,7 @@ const PLAYER_RESPONSE = {
   videoDetails: { videoId: "dQw4w9WgXcQ", channelId: "UCtest123", author: "Test Channel" },
   adPlacements: [{ adPlacementRenderer: { config: {} } }],
   playerAds: [{ playerLegacyDesktopWatchAdsRenderer: {} }],
-  adSlots: [{ adSlotRenderer: {} }],
+  adSlots: [{ [AD_MARKER]: {} }],
   adBreakHeartbeatParams: "abc",
   streamingData: { formats: [{ itag: 18 }] },
   onResponseReceivedActions: [
@@ -68,9 +90,9 @@ const INITIAL_DATA = {
     richGridRenderer: {
       contents: [
         { richItemRenderer: { content: { videoRenderer: { videoId: "real1" } } } },
-        { richItemRenderer: { content: { adSlotRenderer: { adSlotMetadata: {} } } } },
+        { richItemRenderer: { content: { [AD_MARKER]: { marked: true } } } },
         { richItemRenderer: { content: { videoRenderer: { videoId: "real2" } } } },
-        { richSectionRenderer: { content: { statementBannerRenderer: {} } } },
+        { richSectionRenderer: { content: { [AD_MARKER_2]: { marked: true } } } },
         { richItemRenderer: { content: { videoRenderer: {
             videoId: "decoy",
             title: { runs: [{ text: "Why ad blockers are not allowed anymore - explained" }] } } } } },
@@ -165,11 +187,6 @@ function cmp(a, b) {
  * interceptor.js needs them inline (it runs before anything async can load);
  * filters.js holds the copy the update feed ships. Duplication is only safe
  * while something checks it. */
-const FILTERS = new Function(
-  "var globalThis = {};" +
-    fs.readFileSync(path.join(ROOT, "src/filters/filters.js"), "utf8") +
-    "\nreturn CB_FILTERS;"
-)();
 const interceptorSrc = fs.readFileSync(
   path.join(ROOT, "src/inject/interceptor.js"), "utf8"
 );
@@ -342,15 +359,17 @@ check("L2 clears the ad-gated UNPLAYABLE status", pr.status === "OK", `status=${
 check("L2 leaves streamingData intact", pr.streamingKept === true);
 
 /* --- L2: recursive prune of ytInitialData ------------------------------ */
-const idata = await page.evaluate(() => {
+/* The marker names have to be handed across - page.evaluate runs in the
+ * browser, where nothing from this file is in scope. */
+const idata = await page.evaluate(([marker, marker2]) => {
   const c = window.ytInitialData.contents.richGridRenderer.contents;
   return {
     count: c.length,
-    hasAd: JSON.stringify(c).includes("adSlotRenderer"),
-    hasBanner: JSON.stringify(c).includes("statementBannerRenderer"),
+    hasAd: JSON.stringify(c).includes(marker),
+    hasBanner: JSON.stringify(c).includes(marker2),
     realKept: JSON.stringify(c).includes("real1") && JSON.stringify(c).includes("real2")
   };
-});
+}, [AD_MARKER, AD_MARKER_2]);
 check("L2 prunes ad renderers from ytInitialData", !idata.hasAd && !idata.hasBanner);
 check("L2 keeps real feed items", idata.realKept === true, `${idata.count} items left`);
 check("L2 removes the whole ad wrapper, not just the inner key", idata.count === 3, `${idata.count} items left (real1, real2, decoy), expected 3`);
@@ -544,9 +563,43 @@ check(
     : "no stylesheet at all - Chrome may have started without the extension " +
       "(--load-extension is off by default from Chrome 137)"
 );
+/* The fixture page has a <ytd-ad-slot-renderer> on it, but the filter list is
+ * now rebuilt from whatever YouTube happened to show on the day, so naming
+ * any one selector and demanding it be there is a coin flip. What must always
+ * hold is the mechanism: something that IS in the list gets hidden, and
+ * something that is not does not. So take the probe from the live list. */
+const probeSelector = FILTERS.hide.find((s) => /^[a-z][a-z0-9-]*$/.test(s)) || null;
+const probe = probeSelector
+  ? await page.evaluate((sel) => {
+      const el = document.createElement(sel);
+      el.textContent = "probe";
+      document.body.appendChild(el);
+      const hidden = getComputedStyle(el).display === "none";
+      el.remove();
+      return hidden;
+    }, probeSelector)
+  : null;
+check(
+  "L3 hides something that is in the list",
+  probeSelector === null || probe === true,
+  probeSelector ? `${probeSelector} hidden=${probe}` : "the list has no plain element selector"
+);
+
+const notListed = await page.evaluate(() => {
+  const el = document.createElement("cb-definitely-not-an-ad");
+  el.textContent = "real content";
+  document.body.appendChild(el);
+  const hidden = getComputedStyle(el).display === "none";
+  el.remove();
+  return hidden;
+});
+check("...and nothing that is not", notListed === false);
+
 check(
   "L3 hides the in-feed ad slot",
-  cosmetic.feedad === true || cosmetic.feedad === "gone",
+  !FILTERS.hide.includes("ytd-ad-slot-renderer") ||
+    cosmetic.feedad === true ||
+    cosmetic.feedad === "gone",
   `hidden=${cosmetic.feedad}` +
     (cosmetic.feedad === false
       ? ` | selectors accepted ${cosmetic.accepted}, rules ${cosmetic.rules},` +

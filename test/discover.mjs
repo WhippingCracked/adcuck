@@ -85,9 +85,34 @@ for (const n of MUST_NOT) ok(!suspicious(n), `leaves ${n} alone`);
 
 /* ---------- the known-list lookups ---------- */
 
-const src = fs.readFileSync(path.join(ROOT, "src/filters/filters.js"), "utf8");
-const F = new Function("var globalThis = {};" + src + "\nreturn CB_FILTERS;")();
-const known = knownFrom(F);
+/* Against a fixture, not against src/filters/filters.js.
+ *
+ * These used to assert that the real filter list contained particular
+ * entries - "ytd-ad-slot-renderer is in there, so the lookup must find it".
+ * That was only ever true because the list grew and never shrank. Now that a
+ * run rebuilds it from whatever YouTube happened to show that day, the same
+ * assertions fail whenever a run does not happen to meet one of them, which
+ * says nothing at all about whether knownFrom works.
+ *
+ * knownFrom is a pure function. Give it a known input and check the output;
+ * what is in today's filter list is not this test's business. */
+const FIXTURE = {
+  hide: [
+    "ytd-ad-slot-renderer",
+    "ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-ads']",
+    ".ytp-ad-module",
+    ".ytp-ad-overlay-container",
+    "ytd-rich-item-renderer:has(ytd-ad-slot-renderer)",
+    "#panels-full-bleed-container ytd-ad-slot-renderer"
+  ],
+  remove: ["ytd-enforcement-message-view-model"],
+  response: {
+    adMarkers: ["adSlotRenderer", "displayAdRenderer"],
+    playerKeys: ["adPlacements", "playerAds"],
+    adGateReasons: []
+  }
+};
+const known = knownFrom(FIXTURE);
 
 ok(known.tags.has("ytd-ad-slot-renderer"), "known tag list is populated");
 ok(known.tags.has("ytd-engagement-panel-section-list-renderer"),
@@ -95,11 +120,19 @@ ok(known.tags.has("ytd-engagement-panel-section-list-renderer"),
 /* This is the one that used to collapse to "". */
 ok(known.classes.has("ytp-ad-module"), "known class list is populated");
 ok(known.classes.has("ytp-ad-overlay-container"), "second known class registers");
+ok(known.tags.has("ytd-enforcement-message-view-model"), "the remove list counts too");
 ok(!known.tags.has(""), "no empty string leaked into the tag list");
+ok(known.keys.has("adSlotRenderer") && known.keys.has("adPlacements"),
+   "markers and player fields both count as known");
 
-/* Everything already shipped must count as known, or every run re-proposes
- * the entire filter list back to you. */
-for (const k of F.response.adMarkers) ok(known.keys.has(k), `${k} counts as known`);
+/* Whatever is in the real list, every entry of it must count as known -
+ * otherwise a run re-proposes the whole filter list back at you. That claim
+ * holds for any list, including an empty one, so it is safe to make here. */
+const src = fs.readFileSync(path.join(ROOT, "src/filters/filters.js"), "utf8");
+const F = new Function("var globalThis = {};" + src + "\nreturn CB_FILTERS;")();
+const live = knownFrom(F);
+const unknown = F.response.adMarkers.filter((k) => !live.keys.has(k));
+ok(unknown.length === 0, `every shipped marker counts as known (${unknown.join(", ")})`);
 
 /* ---------- walking a response ---------- */
 
