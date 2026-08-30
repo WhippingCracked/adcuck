@@ -9,6 +9,10 @@
 var CB_FILTERS = {
   version: "2026.08.29",
 
+  /* When this list was last edited. A published feed built before
+   * this is stale, and is ignored rather than applied. */
+  editedAt: "2026-08-30T14:25:17.639Z",
+
   /* Hidden with CSS. Cheap, reversible, no layout thrash. */
   hide: [
     "ytd-ad-slot-renderer",
@@ -128,13 +132,7 @@ var CB_FILTERS = {
     ".yt-mealbar-promo-renderer-message-title",
     ".yt-mealbar-promo-renderer-message-text",
     ".yt-mealbar-promo-renderer-supplemental-text",
-    ".yt-mealbar-promo-renderer-modern-icon",
-    ".ytp-paid-content-overlay",
-    ".ytp-paid-content-overlay-link",
-    ".ytp-paid-content-overlay-indicator",
-    ".ytp-paid-content-overlay-icon",
-    ".ytp-paid-content-overlay-text",
-    ".ytp-paid-content-overlay-chevron"
+    ".yt-mealbar-promo-renderer-modern-icon"
   ],
 
   /* Physically removed from the DOM. Reserved for nodes that hold the page
