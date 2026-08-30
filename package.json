@@ -14,7 +14,8 @@
     "icons": "python3 tools/make-icons.py",
     "setup": "npm install && npx playwright install chromium",
     "guard": "node tools/guard-filters.mjs",
-    "reset": "node tools/reset-filters.mjs"
+    "reset": "node tools/reset-filters.mjs",
+    "refresh": "node tools/add-filters.mjs --auto --fresh"
   },
   "devDependencies": {
     "playwright": "^1.56.0"

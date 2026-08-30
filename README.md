@@ -269,11 +269,21 @@ every one of those real names, so the list cannot quietly stop covering them.
 Without `--auto` you get the old behaviour: one at a time, `y` to block it,
 `n` to leave it, `q` to stop.
 
-#### Fresh, not accumulated
+#### Adding vs starting over
 
-`1-get-filters.bat` passes `--fresh`, which **replaces** `hide` and
-`adMarkers` with what this run saw rather than adding to them. The list stays
-a picture of YouTube as it is now instead of everything it has ever been.
+`1-get-filters.bat` **adds** what it found. `npm run refresh` replaces the
+list with just this run's findings instead.
+
+Adding is the default because replacing turned out to be far more expensive
+than it sounds. One run only sees the ads that happened to appear on the pages
+it visited — a single video, the home page and one search. A live 118-filter
+list came back as **10**, and the ads returned within the hour along with the
+old slow start, because `adMarkers` had gone from 44 to 3 and the player was
+waiting on ads again.
+
+The clutter is real, but replacing the whole list every run is not the way to
+deal with it. Dropping entries that have not been seen for several runs would
+be — see the note at the end of this section.
 
 Two things make that safe rather than lossy:
 
@@ -286,8 +296,12 @@ Two things make that safe rather than lossy:
   feeds carry different families of ad, and a fresh run that skipped the feeds
   would quietly throw away every banner filter.
 
-`npm run reset` empties the two lists on demand, and `npm run add` still
-appends rather than replacing.
+`npm run reset` empties the two lists on demand.
+
+**Not yet built:** the honest answer to a cluttered list is ageing, not
+wiping — record which run last saw each filter, and drop the ones that have
+not turned up for several runs. That keeps the list current without ever
+throwing away coverage in a single step.
 
 **What a fresh run never clears**, because nothing on an ordinary page could
 put it back:

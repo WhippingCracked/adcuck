@@ -257,7 +257,13 @@ ok(shipped.length === 0, `nothing shipped is refused (${shipped.join(", ")})`);
 
 const bat = fs.readFileSync(path.join(ROOT, "1-get-filters.bat"), "utf8");
 ok(/--auto/.test(bat), "1-get-filters.bat adds without asking");
-ok(/--fresh/.test(bat), "...and rebuilds the list rather than piling onto it");
+/* Deliberately NOT --fresh. One run only sees the ads that happened to be on
+ * those pages, so replacing the list every time throws away most of the
+ * blocking - it took a 118-filter list down to 10, and the ads came back.
+ * Rebuilding from scratch is still available as `npm run refresh`. */
+ok(!/--fresh/.test(bat), "1-get-filters.bat adds to the list, it does not replace it");
+const pkgJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+ok(/--fresh/.test(pkgJson.scripts.refresh || ""), "a full rebuild is still available");
 
 /* ---------- a fresh run must not lose what it cannot rediscover ---------- */
 
