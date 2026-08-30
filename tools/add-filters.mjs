@@ -17,6 +17,11 @@ import path from "node:path";
 import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { sync } from "./sync-interceptor.mjs";
+import { verdict } from "./never-block.mjs";
+
+/* --auto adds what is unambiguously an advert without asking. 1-get-filters
+ * uses it; `npm run add` without it still walks you through one at a time. */
+const AUTO = process.argv.includes("--auto");
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FILTERS = path.join(ROOT, "src/filters/filters.js");
@@ -53,6 +58,31 @@ function arraySpan(src, key) {
     }
   }
   return null;
+}
+
+/* Record when the list was last edited.
+ *
+ * The extension checks a published feed and replaces its bundled filters with
+ * whatever is there. Between editing this file and remembering to push it,
+ * the published list is OLDER than the bundled one - and without a timestamp
+ * to compare, a fresh install throws away the good list for the stale one and
+ * says nothing. src/content/bridge.js refuses a feed built before this stamp,
+ * which is only possible if the stamp is written. */
+function stampEdited(src) {
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10).replace(/-/g, ".");
+  const iso = now.toISOString();
+
+  let out = src.replace(/version:\s*"[^"]*"/, `version: "${day}"`);
+  if (/editedAt:\s*"[^"]*"/.test(out)) {
+    return out.replace(/editedAt:\s*"[^"]*"/, `editedAt: "${iso}"`);
+  }
+  return out.replace(
+    /(version:\s*"[^"]*",)/,
+    `$1\n\n  /* When this list was last edited. A published feed built before\n` +
+      `   * this is stale, and is ignored rather than applied. */\n` +
+      `  editedAt: "${iso}",`
+  );
 }
 
 function insertInto(src, key, items) {
@@ -123,32 +153,65 @@ if (!candidates.length) {
   process.exit(0);
 }
 
-console.log(`\n  Found ${candidates.length} thing(s) you are not blocking yet.\n`);
-console.log("  Some of these will be real videos that just have \"ad\" in the");
-console.log("  name. Blocking those would hide things you want to watch, so");
-console.log("  say no if you are unsure - you can always add it later.\n");
-console.log("  y = block it    n = leave it    q = stop here\n");
-
 const accept = { hide: [], adMarkers: [] };
+const refused = [];
+const setAside = [];
 let stopped = false;
 
-for (let i = 0; i < candidates.length; i++) {
-  const c = candidates[i];
-  console.log(`  ${"-".repeat(52)}`);
-  console.log(`  ${i + 1} of ${candidates.length}   ${c.what}`);
-  console.log(`  ${c.v}\n`);
+if (AUTO) {
+  /* Nothing is asked. The protected list in never-block.mjs is what makes
+   * that safe: it cannot add page structure, the player or its controls, so
+   * the worst case is a filter that hides nothing rather than one that hides
+   * YouTube. Anything ad-shaped whose ad-word is one of the unreliable ones
+   * is set aside instead of added - that is where every false positive so far
+   * has come from. */
+  console.log(`\n  Found ${candidates.length} thing(s) you are not blocking yet.\n`);
+  for (const c of candidates) {
+    const v = verdict(c.v);
+    if (v === "refuse") refused.push(c.v);
+    else if (v === "unsure") setAside.push(c.v);
+    else accept[c.kind].push(c.v);
+  }
+} else {
+  console.log(`\n  Found ${candidates.length} thing(s) you are not blocking yet.\n`);
+  console.log("  Some of these will be real videos that just have \"ad\" in the");
+  console.log("  name. Blocking those would hide things you want to watch, so");
+  console.log("  say no if you are unsure - you can always add it later.\n");
+  console.log("  y = block it    n = leave it    q = stop here\n");
 
-  let a = "";
-  while (!["y", "n", "q"].includes(a)) a = await ask("  Block it? [y/n/q] ");
-  if (a === "q") { stopped = true; break; }
-  if (a === "y") accept[c.kind].push(c.v);
-  console.log("");
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    console.log(`  ${"-".repeat(52)}`);
+    console.log(`  ${i + 1} of ${candidates.length}   ${c.what}`);
+    console.log(`  ${c.v}\n`);
+
+    let a = "";
+    while (!["y", "n", "q"].includes(a)) a = await ask("  Block it? [y/n/q] ");
+    if (a === "q") { stopped = true; break; }
+    if (a === "y") accept[c.kind].push(c.v);
+    console.log("");
+  }
 }
 
 rl.close();
 
+/* Say what was left out before saying what went in - the things not added are
+ * the ones worth a second of attention. */
+function reportSkipped() {
+  if (refused.length) {
+    console.log(`\n  Refused ${refused.length} - these are parts of YouTube, not adverts:`);
+    refused.forEach((v) => console.log(`    ${v}`));
+  }
+  if (setAside.length) {
+    console.log(`\n  Set aside ${setAside.length} - ad-shaped, but the word could`);
+    console.log("  mean something else. To look at these yourself, run:  npm run add");
+    setAside.forEach((v) => console.log(`    ${v}`));
+  }
+}
+
 const total = accept.hide.length + accept.adMarkers.length;
 if (!total) {
+  reportSkipped();
   console.log(`\n  Nothing added${stopped ? " (stopped early)" : ""}. filters.js is unchanged.\n`);
   process.exit(0);
 }
@@ -161,9 +224,11 @@ try {
   let next = src;
   next = insertInto(next, "hide", accept.hide);
   next = insertInto(next, "adMarkers", accept.adMarkers);
+  next = stampEdited(next);
   fs.writeFileSync(FILTERS, next);
 
   const after = load(fs.readFileSync(FILTERS, "utf8"));
+  if (!after.editedAt) throw new Error("the edit stamp did not get written");
   for (const v of accept.hide) {
     if (!after.hide.includes(v)) throw new Error(`${v} did not make it into the list`);
   }
@@ -181,10 +246,12 @@ try {
   sync();
 
   fs.rmSync(backup);
+  reportSkipped();
   console.log(`\n  Added ${total} filter(s) to src/filters/filters.js\n`);
   accept.hide.forEach((v) => console.log(`    ${v}`));
   accept.adMarkers.forEach((v) => console.log(`    ${v}`));
-  console.log("\n  Next: run 2-check.bat, then 3-send-it.bat\n");
+  console.log("\n  Next: run 2-check.bat, then 3-send-it.bat");
+  console.log("  To undo all of it:  git checkout src/filters/filters.js\n");
 } catch (err) {
   fs.copyFileSync(backup, FILTERS);
   fs.rmSync(backup);

@@ -236,6 +236,21 @@ const ctx = await chromium.launchPersistentContext(userDataDir, {
 // Serve the synthetic page (and a synthetic innertube endpoint) at the real
 // origin so the manifest's match patterns apply.
 const sbRequests = [];
+/* The extension checks the published filter feed as soon as it installs, and
+ * whatever is live on GitHub then REPLACES the bundled list. That made this
+ * suite depend on what happened to be published at the moment it ran: the
+ * same commit passed here and failed on another machine, because one of them
+ * could reach github.io and the other could not, and the published list was
+ * older than the one in the repo.
+ *
+ * A test that asks the internet what it should expect is not a test. Block it
+ * so what gets checked is the list actually in this working copy. */
+let feedRequests = 0;
+await ctx.route("**github.io/**", async (route) => {
+  feedRequests++;
+  await route.abort();
+});
+
 await ctx.route("**sponsor.ajay.app**", async (route) => {
   sbRequests.push(route.request().url());
   return route.fulfill({

@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import {
   words, suspicious, knownFrom, collectKeys, collectDom
 } from "../tools/discover-match.mjs";
+import { verdict } from "../tools/never-block.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -164,6 +165,60 @@ ok(tags.get("ytd-brand-lift-survey-renderer") === 5, "count is the most seen at 
 
 const dsrc = fs.readFileSync(path.join(ROOT, "tools/discover.mjs"), "utf8");
 ok(/DEFAULT_PAGES[\s\S]{0,200}watch\?v=/.test(dsrc), "a watch page is visited first");
+
+/* ---------- what may be added without being asked ---------- */
+
+/* Filters are now added automatically, so the only thing standing between a
+ * name matcher and a broken YouTube is this list. Every entry below is a real
+ * name that a real run has proposed - the header bar and the scrubber dot
+ * both got added for real before this existed. */
+const MUST_REFUSE = [
+  "ytd-masthead", "ytd-masthead-container",     // the whole top bar
+  "yt-progress-bar-playhead",                    // the dot on the scrubber
+  ".ytp-paid-content-overlay",                   // "Includes paid promotion"
+  ".ytp-paid-content-overlay-link",
+  ".ytp-skip-ad", ".ytp-skip-ad-button", ".ytp-skip-ad-button__text",
+  ".ytp-chrome-bottom", ".ytp-progress-bar", ".ytp-play-button",
+  ".ytp-time-current", ".ytp-volume-panel", ".ytp-fullscreen-button",
+  "ytd-watch-flexy", "ytd-app", "ytd-browse", "ytd-page-manager",
+  "ytd-rich-grid-renderer", "ytd-rich-item-renderer", "ytd-video-renderer",
+  "ytd-thumbnail", "ytd-player", "video", "body", "html", "*"
+];
+for (const s of MUST_REFUSE) ok(verdict(s) === "refuse", `refuses ${s}`);
+
+const MUST_ADD = [
+  "ytd-ad-slot-renderer", "ytd-in-feed-ad-layout-renderer",
+  "ytd-promoted-video-renderer", "ytd-display-ad-renderer",
+  "yt-mealbar-promo-renderer", ".ytp-ad-module", ".ytp-ad-overlay-container",
+  ".ytwAdBadgeViewModelHost", ".ytwAdImageViewModelHostImageContainer",
+  "adImageViewModel", "adPlacementRenderer", "displayAdRenderer",
+  /* the ad word is in the part that narrows it down, not the first name */
+  "ytd-rich-item-renderer:has(ytd-ad-slot-renderer)",
+  "#panels-full-bleed-container ytd-ad-slot-renderer",
+  "ytd-engagement-panel-section-list-renderer[target-id='engagement-panel-ads']"
+];
+for (const s of MUST_ADD) ok(verdict(s) === "add", `adds ${s} unattended`);
+
+/* Ad-shaped, but by a word that has lied before. Not refused - just not added
+ * without a person looking. */
+const MUST_SET_ASIDE = [
+  ".ytp-featured-product", "brandVideoShelfRenderer", "ytd-search-pyv-renderer"
+];
+for (const s of MUST_SET_ASIDE) ok(verdict(s) === "unsure", `sets aside ${s}`);
+
+/* A qualifier is what makes a structural name specific enough to block. The
+ * bare name must stay refused even so. */
+ok(verdict("ytd-rich-item-renderer") === "refuse", "a bare grid cell is refused");
+ok(verdict("ytd-rich-item-renderer:has(ytd-ad-slot-renderer)") === "add",
+   "...but an ad-only grid cell is not");
+
+/* Nothing already shipped may be something this would now refuse - that would
+ * mean the list contradicts itself. */
+const shipped = F.hide.concat(F.remove).filter((s) => verdict(s) === "refuse");
+ok(shipped.length === 0, `nothing shipped is refused (${shipped.join(", ")})`);
+
+ok(/--auto/.test(fs.readFileSync(path.join(ROOT, "1-get-filters.bat"), "utf8")),
+   "1-get-filters.bat adds without asking");
 
 console.log(`\n${pass}/${pass + fail} checks passed`);
 process.exit(fail ? 1 : 0);

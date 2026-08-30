@@ -122,10 +122,37 @@
   /* Updated filters arrive from the service worker's feed. The bundled copy
    * in filters.js is what runs at document_start; this refines it a few
    * milliseconds later, which is soon enough for anything that matters. */
+  /* ...but only if it is actually newer than what shipped.
+   *
+   * The feed exists to deliver filters added since this build. It must never
+   * hand back filters from BEFORE it. That is not a hypothetical: between
+   * adding filters locally and remembering to push them, the published list
+   * is older than the bundled one - and a fresh install would quietly throw
+   * away the good list for the stale one, with nothing said anywhere.
+   *
+   * editedAt is stamped into filters.js whenever the list is edited;
+   * generatedAt is when the feed was built from it. A feed built from this
+   * list, or a later one, is always the newer of the two. Both are ISO
+   * strings, so ordering them is a plain comparison. If either is missing -
+   * an older extension, a hand-edited list - fall back to trusting the feed,
+   * which is the behaviour this replaces. */
+  function feedIsNewer(stored, base) {
+    if (!stored.generatedAt || !base.editedAt) return true;
+    return String(stored.generatedAt) >= String(base.editedAt);
+  }
+
   function publishFilters(stored) {
     if (!stored || !stored.cosmetic) return;
     var base = globalThis.CB_FILTERS;
     if (!base) return;
+    if (!feedIsNewer(stored, base)) {
+      try {
+        document.documentElement.dataset.cbFeed = "older-than-bundled";
+      } catch (e) {
+        /* the readout is a convenience, not a job */
+      }
+      return;
+    }
     var c = stored.cosmetic;
     if (c.hide && c.hide.length) base.hide = c.hide;
     if (c.remove && c.remove.length) base.remove = c.remove;

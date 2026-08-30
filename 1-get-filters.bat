@@ -79,17 +79,21 @@ if errorlevel 1 (
 
 echo.
 echo  ============================================
-echo   Now pick which ones to block
+echo   Adding what it found
 echo  ============================================
 echo.
-echo  It will show you one at a time and ask yes or no.
+echo  Anything that is clearly an advert goes straight in.
 echo.
-echo  Some of them will be normal videos that just have
-echo  "ad" somewhere in the name. Say no if you are not
-echo  sure - you can always run this again later.
+echo  It will NOT add parts of YouTube itself - the top bar,
+echo  the player, the buttons on the video. Those are refused
+echo  outright and listed below so you can see what it left.
+echo.
+echo  A few things are ad-shaped but could be something else.
+echo  Those are set aside rather than added. Run  npm run add
+echo  if you want to go through those yourself.
 echo.
 
-call node tools/add-filters.mjs
+call node tools/add-filters.mjs --auto
 if errorlevel 1 (
   echo.
   echo  [X] Nothing was added. The message above says why.
